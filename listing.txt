@@ -1,0 +1,499 @@
+===== ./app.js =====
+const BASE = '/pwa';
+
+registerSW();
+
+function registerSW() {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register(`${BASE}/sw.js`)
+    .then(() => {
+      updateSWStatus('✅ Service Worker terdaftar');
+    })
+    .catch(err => {
+      updateSWStatus('❌ Gagal daftar SW: ' + err.message);
+    });
+  } else {
+    updateSWStatus('⚠️ Service Worker tidak didukung browser');
+  }
+
+  updateOnlineStatus();
+  window.addEventListener('online', updateOnlineStatus);
+  window.addEventListener('offline', updateOnlineStatus);
+}
+
+function updateOnlineStatus() {
+  const statusEl = document.getElementById('online-status');
+  statusEl.textContent = navigator.onLine ? '🌐 Online' : '🚫 Offline';
+}
+
+function updateSWStatus(text) {
+  const swStatusEl = document.getElementById('sw-status');
+  swStatusEl.textContent = text;
+}
+
+// ======= Tambahan untuk fitur install prompt =======
+let deferredPrompt;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  // Cegah browser memunculkan prompt default
+  e.preventDefault();
+  deferredPrompt = e;
+
+  // Buat tombol install manual
+  const installButton = document.createElement('button');
+  installButton.textContent = 'Pasang ke Perangkat';
+  installButton.style.marginTop = '20px';
+  installButton.style.padding = '10px 20px';
+  installButton.style.fontSize = '1rem';
+  installButton.style.cursor = 'pointer';
+
+  const infoDiv = document.getElementById('pwa-info');
+  infoDiv.appendChild(installButton);
+
+  installButton.addEventListener('click', () => {
+    installButton.remove();
+    deferredPrompt.prompt();
+
+    deferredPrompt.userChoice.then(choice => {
+      if (choice.outcome === 'accepted') {
+        console.log('Pengguna menyetujui pemasangan.');
+      } else {
+        console.log('Pengguna membatalkan pemasangan.');
+      }
+      deferredPrompt = null;
+    });
+  });
+});
+
+===== ./.gitignore =====
+
+===== ./icons/icon-128x128.png =====
+[file gambar: isi tidak ditampilkan]
+
+===== ./icons/icon-144x144.png =====
+[file gambar: isi tidak ditampilkan]
+
+===== ./icons/icon-152x152.png =====
+[file gambar: isi tidak ditampilkan]
+
+===== ./icons/icon-192x192.png =====
+[file gambar: isi tidak ditampilkan]
+
+===== ./icons/icon-256x256.png =====
+[file gambar: isi tidak ditampilkan]
+
+===== ./icons/icon-384x384.png =====
+[file gambar: isi tidak ditampilkan]
+
+===== ./icons/icon-48x48.png =====
+[file gambar: isi tidak ditampilkan]
+
+===== ./icons/icon-512x512.png =====
+[file gambar: isi tidak ditampilkan]
+
+===== ./icons/icon-72x72.png =====
+[file gambar: isi tidak ditampilkan]
+
+===== ./icons/icon-96x96.png =====
+[file gambar: isi tidak ditampilkan]
+
+===== ./index.html =====
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Profile PWA - Revalidate Strategy</title>
+  <link rel="manifest" href="/pwa/manifest.json" />
+  <meta name="theme-color" content="#0077cc" />
+
+  <link rel="stylesheet" href="style.css" />
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <div class="container">
+    <h1>Profile</h1>
+    <ul class="bio">
+      <li><strong>NIM:</strong> 225410001</li>
+      <li><strong>Nama:</strong> Gilang Teja Krishna</li>
+      <li><strong>Universitas:</strong> UTDI</li>
+      <li><strong>Role:</strong> Tech Architect</li>
+    </ul>
+
+    <div id="pwa-info">
+      <h2>Info PWA</h2>
+      <p><strong>Strategi Caching:</strong> <span id="strategy">Revalidate</span></p>
+      <p><strong>Status Koneksi:</strong> <span id="online-status">Memeriksa...</span></p>
+      <p><strong>Status Service Worker:</strong> <span id="sw-status">Memeriksa...</span></p>
+    </div>
+  </div>
+</body>
+</html>
+
+===== ./listing.txt =====
+
+===== ./makefile =====
+# Makefile untuk mencetak semua file, kecuali:
+# - isi file gambar tidak ditampilkan (hanya path)
+
+.PHONY: list export
+
+list:
+	@find . -type f ! -path "./.git/*" | sort | while read file; do \
+		echo "===== $$file ====="; \
+		if file "$$file" | grep -qE 'image|bitmap' && ! [[ "$$file" =~ ^./icons/ ]]; then \
+			echo "[file gambar: isi tidak ditampilkan]"; \
+		else \
+			cat "$$file"; \
+		fi; \
+		echo ""; \
+	done
+
+export:
+	@find . -type f ! -path "./.git/*" | sort | while read file; do \
+		echo "===== $$file ====="; \
+		if file "$$file" | grep -qE 'image|bitmap' && ! [[ "$$file" =~ ^./icons/ ]]; then \
+			echo "[file gambar: isi tidak ditampilkan]"; \
+		else \
+			cat "$$file"; \
+		fi; \
+		echo ""; \
+	done > listing.txt
+	@echo "Listing file sudah diekspor ke listing.txt"
+===== ./manifest.json =====
+{
+  "name": "PWA Profile",
+  "short_name": "Profile PWA",
+  "description": "Profil Mahasiswa PWA Offline-ready",
+  "start_url": "/pwa/",
+  "display": "standalone",
+  "background_color": "#fefefe",
+  "theme_color": "#0077cc",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/pwa/icons/icon-48x48.png",
+      "sizes": "48x48",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/pwa/icons/icon-72x72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/pwa/icons/icon-96x96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/pwa/icons/icon-128x128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/pwa/icons/icon-144x144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/pwa/icons/icon-152x152.png",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/pwa/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/pwa/icons/icon-256x256.png",
+      "sizes": "256x256",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/pwa/icons/icon-384x384.png",
+      "sizes": "384x384",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/pwa/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
+===== ./offline.html =====
+<!-- pwa-profile/index.html -->
+
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Profile PWA - Revalidate Strategy</title>
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#0077cc" />
+  <link rel="stylesheet" href="style.css" />
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <div class="container">
+    <h1>Profile On Offline Mode</h1>
+    <ul class="bio">
+      <li><strong>NIM:</strong> 225410001</li>
+      <li><strong>Nama:</strong> Gilang Teja Krishna</li>
+      <li><strong>Universitas:</strong> UTDI</li>
+      <li><strong>Role:</strong> Tech Architect</li>
+    </ul>
+
+    <div id="pwa-info">
+      <h2>Info PWA</h2>
+      <p><strong>Strategi Caching:</strong> <span id="strategy">Revalidate</span></p>
+      <p><strong>Status Koneksi:</strong> <span id="online-status">Memeriksa...</span></p>
+      <p><strong>Status Service Worker:</strong> <span id="sw-status">Memeriksa...</span></p>
+    </div>
+  </div>
+</body>
+</html>
+
+===== ./style.css =====
+/* pwa-profile/style.css */
+
+:root {
+  --primary: #111827;
+  --secondary: #6b7280;
+  --accent: #3b82f6;
+  --accent-light: #bfdbfe;
+  --bg: #fefefe;
+  --card-bg: #ffffff;
+  --shadow-light: 0 8px 24px rgba(59, 130, 246, 0.15);
+  --radius: 20px;
+  --transition: 0.3s ease;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Poppins', 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--bg);
+  color: var(--primary);
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 40px 20px;
+  transition: background-color var(--transition);
+}
+
+.container {
+  width: 100%;
+  max-width: 520px;
+  background: var(--card-bg);
+  padding: 36px 32px;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-light);
+  text-align: center;
+  position: relative;
+}
+
+h1 {
+  font-weight: 700;
+  font-size: 2.4rem;
+  margin-bottom: 24px;
+  letter-spacing: 1px;
+  color: var(--primary);
+  user-select: none;
+}
+
+h2 {
+  font-weight: 600;
+  font-size: 1.4rem;
+  margin-top: 40px;
+  margin-bottom: 16px;
+  color: var(--accent);
+}
+
+img {
+  border-radius: 50%;
+  width: 140px;
+  height: 140px;
+  object-fit: cover;
+  margin: 0 auto 24px;
+  box-shadow: 0 16px 40px rgba(59, 130, 246, 0.3);
+  transition: transform var(--transition);
+  cursor: pointer;
+}
+img:hover {
+  transform: scale(1.05);
+}
+
+.bio {
+  list-style: none;
+  margin-top: 0;
+  padding-left: 0;
+  text-align: left;
+  color: var(--secondary);
+  font-size: 1.1rem;
+  line-height: 1.5;
+  user-select: text;
+}
+
+.bio li {
+  padding: 14px 0;
+  border-bottom: 1px solid #e4e7eb;
+  transition: color var(--transition);
+}
+
+.bio li:last-child {
+  border-bottom: none;
+}
+
+.bio li strong {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+#repo {
+  margin-top: 30px;
+  text-align: left;
+  background: var(--accent-light);
+  padding: 20px 24px;
+  border-radius: 16px;
+  color: var(--primary);
+  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.1);
+  font-size: 1rem;
+  user-select: text;
+}
+
+#repo p {
+  margin-bottom: 10px;
+}
+
+#repo a {
+  color: var(--accent);
+  font-weight: 700;
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  transition: border-color var(--transition);
+}
+
+#repo a:hover {
+  border-color: var(--accent);
+}
+
+output {
+  margin-top: 28px;
+  display: block;
+  font-size: 0.9rem;
+  color: var(--secondary);
+  user-select: none;
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  body {
+    padding: 30px 16px;
+  }
+  .container {
+    padding: 28px 20px;
+  }
+  h1 {
+    font-size: 2rem;
+  }
+  h2 {
+    font-size: 1.2rem;
+  }
+  img {
+    width: 110px;
+    height: 110px;
+  }
+  .bio li {
+    font-size: 1rem;
+    padding: 10px 0;
+  }
+  #repo {
+    font-size: 0.9rem;
+  }
+}
+
+===== ./sw.js =====
+const BASE = '/pwa';
+const CACHE_NAME = 'pwa-revalidate-v1';
+const ASSETS_TO_CACHE = [
+  `${BASE}/`,
+  `${BASE}/index.html`,
+  `${BASE}/style.css`,
+  `${BASE}/app.js`,
+  `${BASE}/offline.html`
+];
+
+// Cache asset saat install
+self.addEventListener('install', event => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then(cache => {
+      return cache.addAll(ASSETS_TO_CACHE);
+    })
+  );
+  self.skipWaiting();
+});
+
+// Bersihkan cache lama saat activate
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys().then(keys =>
+      Promise.all(
+        keys.map(key => {
+          if (key !== CACHE_NAME) {
+            return caches.delete(key);
+          }
+        })
+      )
+    )
+  );
+  self.clients.claim();
+});
+
+// Tangani fetch dan fallback ke offline.html
+self.addEventListener('fetch', event => {
+  // Abaikan request non-GET
+  if (event.request.method !== 'GET') return;
+
+  event.respondWith(
+    fetch(event.request)
+      .then(networkResponse => {
+        // Update cache dengan response terbaru
+        caches.open(CACHE_NAME).then(cache => {
+          cache.put(event.request, networkResponse.clone());
+        });
+        return networkResponse.clone();
+      })
+      .catch(async () => {
+        const cache = await caches.open(CACHE_NAME);
+
+        // Fallback ke offline.html kalau request HTML
+        const acceptHeader = event.request.headers.get('accept') || '';
+        if (acceptHeader.includes('text/html')) {
+          return cache.match(`${BASE}/offline.html`);
+        }
+
+        // Kalau bukan HTML, coba cari file yang cocok di cache
+        return cache.match(event.request);
+      })
+  );
+});
+

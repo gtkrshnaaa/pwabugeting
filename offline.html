@@ -1,0 +1,32 @@
+<!-- pwa-profile/index.html -->
+
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Profile PWA - Revalidate Strategy</title>
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#0077cc" />
+  <link rel="stylesheet" href="style.css" />
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <div class="container">
+    <h1>Profile On Offline Mode</h1>
+    <ul class="bio">
+      <li><strong>NIM:</strong> 225410001</li>
+      <li><strong>Nama:</strong> Gilang Teja Krishna</li>
+      <li><strong>Universitas:</strong> UTDI</li>
+      <li><strong>Role:</strong> Tech Architect</li>
+    </ul>
+
+    <div id="pwa-info">
+      <h2>Info PWA</h2>
+      <p><strong>Strategi Caching:</strong> <span id="strategy">Revalidate</span></p>
+      <p><strong>Status Koneksi:</strong> <span id="online-status">Memeriksa...</span></p>
+      <p><strong>Status Service Worker:</strong> <span id="sw-status">Memeriksa...</span></p>
+    </div>
+  </div>
+</body>
+</html>
