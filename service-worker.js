@@ -1,15 +1,13 @@
-// service-worker.js
-
-const CACHE_NAME = 'dompet-damai-v1.1'; // Naikkan versi cache
+const CACHE_NAME = 'dompet-damai-cache-v2';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
-    './style.css',
-    './app.js',
     './db.js',
-    './utils.js',
-    'https://cdn.jsdelivr.net/npm/idb@7/build/umd.js',
+    './app.js',
     './manifest.json',
+    'https://cdn.tailwindcss.com',
+    'https://cdn.jsdelivr.net/npm/idb@7/build/umd.js',
+    'https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap',
     './icons/icon-192x192.png',
     './icons/icon-512x512.png'
 ];
@@ -21,9 +19,6 @@ self.addEventListener('install', event => {
             .then(cache => {
                 console.log('Service Worker: Caching files');
                 return cache.addAll(ASSETS_TO_CACHE);
-            })
-            .catch(err => {
-                console.error('Gagal membuka cache', err);
             })
     );
     self.skipWaiting();
@@ -46,25 +41,15 @@ self.addEventListener('activate', event => {
     return self.clients.claim();
 });
 
-// Event: Fetch
+// Event: Fetch (Strategi Network First, Fallback to Cache)
 self.addEventListener('fetch', event => {
+    // Abaikan request non-GET
     if (event.request.method !== 'GET') return;
-
+    
     event.respondWith(
-        caches.match(event.request)
-            .then(cachedResponse => {
-                // Jika ada di cache, langsung kembalikan
-                if (cachedResponse) {
-                    return cachedResponse;
-                }
-
-                // Jika tidak, ambil dari network
-                return fetch(event.request).catch(() => {
-                    // Jika request navigasi HTML gagal, fallback ke index.html
-                    if (event.request.mode === 'navigate') {
-                        return caches.match('./index.html');
-                    }
-                });
-            })
+        fetch(event.request).catch(() => {
+            // Jika network gagal, cari di cache
+            return caches.match(event.request);
+        })
     );
 });

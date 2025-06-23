@@ -1,212 +1,290 @@
+// app.js - Logika Utama Aplikasi Budgeting
+
 document.addEventListener('DOMContentLoaded', () => {
-    // Registrasi Service Worker
+    // Registrasi Service Worker & Inisialisasi PWA
     registerServiceWorker();
+    initPwaInstall();
 
-    // Inisialisasi semua elemen UI
-    const budgetForm = document.getElementById('budget-form');
-    const monthlyBudgetInput = document.getElementById('monthly-budget');
-    const categoryForm = document.getElementById('category-form');
-    const categoryNameInput = document.getElementById('category-name');
-    const categoryTargetInput = document.getElementById('category-target');
-    const transactionForm = document.getElementById('transaction-form');
-    const transactionAmountInput = document.getElementById('transaction-amount');
-    const transactionDescInput = document.getElementById('transaction-desc');
-    const exportJsonBtn = document.getElementById('export-json-btn');
-    const exportCsvBtn = document.getElementById('export-csv-btn');
+    // --- Seleksi Elemen DOM ---
+    const setupButton = document.getElementById('setup-button');
+    const addExpenseButton = document.getElementById('add-expense-button');
+    
+    // Elemen Modal Setup
+    const setupModal = document.getElementById('setup-modal');
+    const closeSetupModalBtn = document.getElementById('close-setup-modal');
+    const setupForm = document.getElementById('setup-form');
+    const addCategoryFieldBtn = document.getElementById('add-category-field-button');
 
-    // Event Listener
-    budgetForm.addEventListener('submit', handleSetBudget);
-    categoryForm.addEventListener('submit', handleAddCategory);
-    transactionForm.addEventListener('submit', handleAddTransaction);
-    exportJsonBtn.addEventListener('click', exportToJSON);
-    exportCsvBtn.addEventListener('click', exportToCSV);
+    // Elemen Modal Expense
+    const expenseModal = document.getElementById('expense-modal');
+    const closeExpenseModalBtn = document.getElementById('close-expense-modal');
+    const expenseForm = document.getElementById('expense-form');
+    
+    const modalOverlay = document.getElementById('modal-overlay');
 
-    // Muat data saat aplikasi pertama kali dibuka
-    renderDashboard();
+    // --- Event Listeners ---
+    setupButton.addEventListener('click', () => showModal(setupModal));
+    addExpenseButton.addEventListener('click', () => showModal(expenseModal));
+    
+    // Listeners untuk menutup modal
+    [closeSetupModalBtn, closeExpenseModalBtn, modalOverlay].forEach(el => {
+        el.addEventListener('click', () => {
+            hideModal(setupModal);
+            hideModal(expenseModal);
+        });
+    });
+
+    // Listeners untuk form
+    addCategoryFieldBtn.addEventListener('click', createCategoryInput);
+    setupForm.addEventListener('submit', handleSetupForm);
+    expenseForm.addEventListener('submit', handleExpenseForm);
+    
+    // --- Inisialisasi Aplikasi ---
+    renderUI();
 });
 
-// Fungsi untuk me-render seluruh tampilan utama
-async function renderDashboard() {
-    await renderBudgetSummary();
-    await renderCategoryList();
-    await renderTransactionHistory();
+// =======================================================
+// FUNGSI RENDER TAMPILAN
+// =======================================================
+
+async function renderUI() {
+    await renderSummary();
+    await renderCategories();
+    await renderExpenseHistory();
+    await populateCategoryDropdown(); // Untuk form pengeluaran
+    checkIfInitialSetupNeeded();
 }
 
-// Render ringkasan anggaran
-async function renderBudgetSummary() {
-    const summaryTargetEl = document.getElementById('summary-target');
-    const summaryAllocatedEl = document.getElementById('summary-allocated');
-    const summaryRemainingEl = document.getElementById('summary-remaining');
-    const monthlyBudgetInput = document.getElementById('monthly-budget');
+async function renderSummary() {
+    const limit = await getConfig('totalBudget') || 0;
+    const allExpenses = await getExpenses();
+    const spent = allExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+    const remaining = limit - spent;
 
-    const budget = await getConfig('monthlyBudget') || 0;
-    const categories = await getCategories();
-    const totalAllocated = categories.reduce((sum, cat) => sum + cat.allocated, 0);
-    const remaining = Math.max(0, budget - totalAllocated);
-
-    monthlyBudgetInput.value = budget > 0 ? budget : '';
-    summaryTargetEl.textContent = formatCurrency(budget);
-    summaryAllocatedEl.textContent = formatCurrency(totalAllocated);
-    summaryRemainingEl.textContent = formatCurrency(remaining);
+    document.getElementById('summary-limit').textContent = formatCurrency(limit);
+    document.getElementById('summary-spent').textContent = formatCurrency(spent);
+    document.getElementById('summary-remaining').textContent = formatCurrency(remaining);
 }
 
-// Render daftar kategori beserta progress bar-nya
-async function renderCategoryList() {
+async function renderCategories() {
     const categoryListEl = document.getElementById('category-list');
     const categories = await getCategories();
 
     if (categories.length === 0) {
-        categoryListEl.innerHTML = '<p>Belum ada kategori. Silakan tambahkan di bawah.</p>';
+        categoryListEl.innerHTML = `<p class="text-center text-gray-500 text-sm">Belum ada kategori. Klik 'Atur' untuk memulai.</p>`;
         return;
     }
 
-    categoryListEl.innerHTML = ''; // Kosongkan daftar
-    categories.forEach(cat => {
-        const progress = cat.target > 0 ? (cat.allocated / cat.target) * 100 : 0;
+    categoryListEl.innerHTML = '';
+    for (const cat of categories) {
+        const expensesForCat = await getExpensesByCategoryId(cat.id);
+        const spentOnCat = expensesForCat.reduce((sum, exp) => sum + exp.amount, 0);
+        const progress = cat.limit > 0 ? (spentOnCat / cat.limit) * 100 : 0;
+        
         const item = document.createElement('div');
-        item.className = 'category-item';
         item.innerHTML = `
-            <div class="category-info">
-                <span class="category-name">${cat.name}</span>
-                <span class="category-amount">${formatCurrency(cat.allocated)} / ${formatCurrency(cat.target)}</span>
+            <div class="flex justify-between items-center mb-1">
+                <span class="font-semibold text-gray-700">${cat.name}</span>
+                <span class="text-sm text-gray-500">${formatCurrency(spentOnCat)} / ${formatCurrency(cat.limit)}</span>
             </div>
-            <div class="progress-bar">
-                <div class="progress-bar-fill" style="width: ${Math.min(100, progress)}%;"></div>
+            <div class="w-full bg-emerald-100 rounded-full h-2.5">
+                <div class="bg-gradient-to-r from-green-300 to-emerald-500 h-2.5 rounded-full" style="width: ${Math.min(100, progress)}%"></div>
             </div>
         `;
         categoryListEl.appendChild(item);
-    });
+    }
 }
 
-// Render riwayat pemasukan
-async function renderTransactionHistory() {
-    const historyEl = document.getElementById('transaction-history');
-    const transactions = await getTransactions();
+async function renderExpenseHistory() {
+    const historyEl = document.getElementById('expense-history');
+    const expenses = (await getExpenses()).reverse(); // Terbaru di atas
 
-    if (transactions.length === 0) {
-        historyEl.innerHTML = '<p>Belum ada riwayat pemasukan.</p>';
+    if (expenses.length === 0) {
+        historyEl.innerHTML = `<p class="text-center text-gray-500 text-sm">Belum ada pengeluaran.</p>`;
         return;
     }
-
     historyEl.innerHTML = '';
-    transactions.forEach(tx => {
+    const categories = await getCategories();
+    const categoryMap = new Map(categories.map(cat => [cat.id, cat.name]));
+
+    expenses.slice(0, 10).forEach(exp => { // Tampilkan 10 terakhir
         const item = document.createElement('div');
-        item.className = 'transaction-item';
+        item.className = "flex justify-between items-center text-sm";
         item.innerHTML = `
             <div>
-                <div class="amount">${formatCurrency(tx.amount)}</div>
-                <div class="date">${new Date(tx.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric'})} - ${tx.description || 'Pemasukan'}</div>
+                <p class="font-semibold">${exp.description || 'Pengeluaran'}</p>
+                <p class="text-xs text-gray-500">${categoryMap.get(exp.categoryId) || 'Lainnya'}</p>
             </div>
+            <span class="font-semibold text-red-500">${formatCurrency(exp.amount)}</span>
         `;
         historyEl.appendChild(item);
     });
 }
 
-// --- Handler untuk Form dan Button ---
-
-async function handleSetBudget(e) {
-    e.preventDefault();
-    const budgetValue = parseFloat(document.getElementById('monthly-budget').value);
-    if (isNaN(budgetValue) || budgetValue < 0) {
-        alert('Mohon masukkan jumlah anggaran yang valid.');
-        return;
-    }
-    await setConfig('monthlyBudget', budgetValue);
-    await renderBudgetSummary();
-}
-
-async function handleAddCategory(e) {
-    e.preventDefault();
-    const name = document.getElementById('category-name').value.trim();
-    const target = parseFloat(document.getElementById('category-target').value);
-
-    if (!name || isNaN(target) || target <= 0) {
-        alert('Nama kategori dan target harus diisi dengan benar.');
-        return;
-    }
-
-    const newCategory = { name, target, allocated: 0 };
-    await addCategory(newCategory);
-    
-    // Reset form dan re-render
-    document.getElementById('category-form').reset();
-    await renderCategoryList();
-}
-
-async function handleAddTransaction(e) {
-    e.preventDefault();
-    const amount = parseFloat(document.getElementById('transaction-amount').value);
-    const description = document.getElementById('transaction-desc').value.trim();
-
-    if (isNaN(amount) || amount <= 0) {
-        alert('Jumlah pemasukan tidak valid.');
-        return;
-    }
-
-    // Simpan transaksi
-    await addTransaction({ amount, description, date: new Date().toISOString() });
-    
-    // Distribusikan dana ke kategori
-    await distributeFunds(amount);
-
-    // Reset form dan re-render seluruh dashboard
-    document.getElementById('transaction-form').reset();
-    await renderDashboard();
-}
-
-// Logika untuk mendistribusikan dana ke kategori secara berurutan
-async function distributeFunds(amount) {
-    let remainingAmount = amount;
+async function populateCategoryDropdown() {
+    const selectEl = document.getElementById('expense-category');
     const categories = await getCategories();
+    selectEl.innerHTML = '<option value="" disabled selected>Pilih kategori...</option>';
+    categories.forEach(cat => {
+        const option = document.createElement('option');
+        option.value = cat.id;
+        option.textContent = cat.name;
+        selectEl.appendChild(option);
+    });
+}
 
-    for (const category of categories) {
-        if (remainingAmount <= 0) break;
+// =======================================================
+// FUNGSI MODAL & FORM HANDLER
+// =======================================================
 
-        const needed = category.target - category.allocated;
-        if (needed > 0) {
-            const toAllocate = Math.min(remainingAmount, needed);
-            category.allocated += toAllocate;
-            remainingAmount -= toAllocate;
-            await updateCategory(category);
+function showModal(modalEl) {
+    const modalContent = modalEl.querySelector('div');
+    document.getElementById('modal-overlay').classList.remove('hidden');
+    modalEl.classList.remove('hidden');
+    // Trigger transisi
+    setTimeout(() => {
+        modalContent.classList.remove('scale-95', 'opacity-0');
+        modalContent.classList.add('scale-100', 'opacity-100');
+    }, 10);
+}
+
+function hideModal(modalEl) {
+    const modalContent = modalEl.querySelector('div');
+    document.getElementById('modal-overlay').classList.add('hidden');
+    modalContent.classList.remove('scale-100', 'opacity-100');
+    modalContent.classList.add('scale-95', 'opacity-0');
+    setTimeout(() => {
+         modalEl.classList.add('hidden');
+    }, 200); // Sesuaikan dengan durasi transisi
+}
+
+function createCategoryInput() {
+    const container = document.getElementById('category-fields');
+    const fieldWrapper = document.createElement('div');
+    fieldWrapper.className = 'flex gap-2 items-center';
+    fieldWrapper.innerHTML = `
+        <input type="text" name="category_name" class="w-2/3 p-2 border border-emerald-200 rounded-lg" placeholder="Nama Kategori" required>
+        <input type="number" name="category_limit" class="w-1/3 p-2 border border-emerald-200 rounded-lg" placeholder="Limit" required>
+        <button type="button" class="text-red-500 remove-cat-btn">&times;</button>
+    `;
+    container.appendChild(fieldWrapper);
+    
+    fieldWrapper.querySelector('.remove-cat-btn').addEventListener('click', () => {
+        fieldWrapper.remove();
+    });
+}
+
+async function handleSetupForm(e) {
+    e.preventDefault();
+    const totalBudget = parseFloat(document.getElementById('total-budget').value);
+    
+    if (isNaN(totalBudget) || totalBudget <= 0) {
+        alert('Total anggaran harus diisi dengan angka yang valid.');
+        return;
+    }
+    
+    const categoryNames = document.querySelectorAll('input[name="category_name"]');
+    const categoryLimits = document.querySelectorAll('input[name="category_limit"]');
+    let totalLimit = 0;
+    const categories = [];
+
+    for (let i = 0; i < categoryNames.length; i++) {
+        const name = categoryNames[i].value.trim();
+        const limit = parseFloat(categoryLimits[i].value);
+        if (name && !isNaN(limit) && limit > 0) {
+            totalLimit += limit;
+            categories.push({ name, limit });
         }
     }
+    
+    if (totalLimit > totalBudget) {
+        alert('Total limit kategori tidak boleh melebihi total anggaran bulanan!');
+        return;
+    }
+
+    // Simpan ke DB
+    await setConfig('totalBudget', totalBudget);
+    await clearCategories(); // Hapus kategori lama sebelum menambah yang baru
+    for (const cat of categories) {
+        await addCategory(cat);
+    }
+
+    hideModal(document.getElementById('setup-modal'));
+    await renderUI();
 }
 
+async function handleExpenseForm(e) {
+    e.preventDefault();
+    const amount = parseFloat(document.getElementById('expense-amount').value);
+    const categoryId = parseInt(document.getElementById('expense-category').value, 10);
+    const description = document.getElementById('expense-desc').value.trim();
+    
+    if (isNaN(amount) || amount <= 0 || isNaN(categoryId)) {
+        alert('Mohon isi jumlah dan kategori dengan benar.');
+        return;
+    }
+    
+    await addExpense({
+        amount,
+        categoryId,
+        description,
+        date: new Date().toISOString()
+    });
+    
+    document.getElementById('expense-form').reset();
+    hideModal(document.getElementById('expense-modal'));
+    await renderUI();
+}
 
-// --- Logika PWA (Service Worker & Install Prompt) ---
+// Cek apakah setup awal perlu dilakukan
+async function checkIfInitialSetupNeeded() {
+    const budget = await getConfig('totalBudget');
+    if (!budget || budget === 0) {
+        showModal(document.getElementById('setup-modal'));
+        document.getElementById('close-setup-modal').classList.add('hidden'); // Sembunyikan tombol batal saat setup awal
+    } else {
+        document.getElementById('close-setup-modal').classList.remove('hidden');
+    }
+}
+
+// =======================================================
+// FUNGSI BANTUAN & PWA
+// =======================================================
+
+function formatCurrency(amount) {
+    return new Intl.NumberFormat('id-ID', {
+        style: 'currency', currency: 'IDR', minimumFractionDigits: 0
+    }).format(amount);
+}
+
 function registerServiceWorker() {
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('service-worker.js')
-            .then(reg => console.log('Service Worker terdaftar.', reg))
-            .catch(err => console.error('Gagal mendaftarkan Service Worker:', err));
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./service-worker.js')
+                .then(reg => console.log('Service Worker terdaftar.', reg))
+                .catch(err => console.error('Gagal mendaftarkan Service Worker:', err));
+        });
     }
 }
 
 let deferredPrompt;
-const installContainer = document.getElementById('install-container');
+function initPwaInstall() {
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        const installContainer = document.getElementById('install-container');
+        installContainer.innerHTML = ''; // Hapus tombol lama jika ada
+        const installButton = document.createElement('button');
+        installButton.textContent = 'Pasang Aplikasi Dompet Damai';
+        installButton.className = 'px-4 py-2 bg-emerald-500 text-white font-semibold rounded-lg shadow-md hover:bg-emerald-600 transition';
+        installContainer.appendChild(installButton);
 
-window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredPrompt = e;
-    
-    // Tampilkan tombol install
-    const installButton = document.createElement('button');
-    installButton.id = 'install-button';
-    installButton.className = 'btn btn-primary';
-    installButton.textContent = 'Pasang Aplikasi ke Perangkat';
-    installContainer.innerHTML = ''; // Bersihkan dulu
-    installContainer.appendChild(installButton);
-
-    installButton.addEventListener('click', () => {
-        installButton.style.display = 'none';
-        deferredPrompt.prompt();
-        deferredPrompt.userChoice.then((choiceResult) => {
-            if (choiceResult.outcome === 'accepted') {
-                console.log('Pengguna menyetujui pemasangan');
-            } else {
-                console.log('Pengguna menolak pemasangan');
-            }
-            deferredPrompt = null;
+        installButton.addEventListener('click', () => {
+            installButton.style.display = 'none';
+            deferredPrompt.prompt();
+            deferredPrompt.userChoice.then((choice) => {
+                deferredPrompt = null;
+            });
         });
     });
-});
+}
