@@ -2,35 +2,32 @@
 // app.js - Logika Utama Aplikasi Budgeting
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Registrasi Service Worker & Inisialisasi PWA
-    registerServiceWorker();
-    initPwaInstall();
-
     // --- Seleksi Elemen DOM ---
     const setupButton = document.getElementById('setup-button');
     const addExpenseButton = document.getElementById('add-expense-button');
-    
-    // Modal Setup
     const setupModal = document.getElementById('setup-modal');
-    const closeSetupModalBtn = document.getElementById('close-setup-modal');
-    const setupForm = document.getElementById('setup-form');
-    const addCategoryFieldBtn = document.getElementById('add-category-field-button');
-
-    // Modal Expense
     const expenseModal = document.getElementById('expense-modal');
-    const closeExpenseModalBtn = document.getElementById('close-expense-modal');
-    const expenseForm = document.getElementById('expense-form');
-    
-    // Modal Reset (Baru)
-    const resetDataBtn = document.getElementById('reset-data-button');
     const confirmResetModal = document.getElementById('confirm-reset-modal');
-    const cancelResetBtn = document.getElementById('cancel-reset-btn');
-    const confirmResetBtn = document.getElementById('confirm-reset-btn');
-
     const modalOverlay = document.getElementById('modal-overlay');
 
+    // Form
+    const setupForm = document.getElementById('setup-form');
+    const expenseForm = document.getElementById('expense-form');
+    
+    // Tombol Modal
+    const closeSetupModalBtn = document.getElementById('close-setup-modal');
+    const closeExpenseModalBtn = document.getElementById('close-expense-modal');
+    const addCategoryFieldBtn = document.getElementById('add-category-field-button');
+    
+    // Tombol Aksi
+    const resetDataBtn = document.getElementById('reset-data-button');
+    const cancelResetBtn = document.getElementById('cancel-reset-btn');
+    const confirmResetBtn = document.getElementById('confirm-reset-btn');
+    const exportJsonBtn = document.getElementById('export-json-btn');
+    const exportCsvBtn = document.getElementById('export-csv-btn');
+
     // --- Event Listeners ---
-    setupButton.addEventListener('click', () => showModal(setupModal));
+    setupButton.addEventListener('click', openSetupModal); // Menggunakan fungsi baru
     addExpenseButton.addEventListener('click', () => showModal(expenseModal));
     
     [closeSetupModalBtn, closeExpenseModalBtn, modalOverlay, cancelResetBtn].forEach(el => {
@@ -41,22 +38,27 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    addCategoryFieldBtn.addEventListener('click', createCategoryInput);
+    addCategoryFieldBtn.addEventListener('click', () => createCategoryInput());
     setupForm.addEventListener('submit', handleSetupForm);
     expenseForm.addEventListener('submit', handleExpenseForm);
     
-    // Listeners untuk Reset (Baru)
     resetDataBtn.addEventListener('click', () => {
-        hideModal(setupModal); // Sembunyikan modal setup
-        showModal(confirmResetModal); // Tampilkan modal konfirmasi
+        hideModal(setupModal);
+        showModal(confirmResetModal);
     });
     confirmResetBtn.addEventListener('click', handleDataReset);
+
+    // Event listener untuk tombol ekspor
+    exportJsonBtn.addEventListener('click', exportToJSON);
+    exportCsvBtn.addEventListener('click', exportToCSV);
     
-    // --- Inisialisasi Aplikasi ---
+    // --- Inisialisasi ---
+    registerServiceWorker();
+    initPwaInstall();
     renderUI();
 });
 
-// ... (Sisa fungsi renderUI, renderSummary, renderCategories, dll. tetap sama) ...
+// --- Fungsi Utama Render ---
 async function renderUI() {
     await renderSummary();
     await renderCategories();
@@ -68,9 +70,11 @@ async function renderUI() {
 async function renderSummary() {
     const limit = await getConfig('totalBudget') || 0;
     const allExpenses = await getExpenses();
-    const spent = allExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+    const spent = allExpenses.reduce((sum, exp) => sum + exp.amount, 0);
     const remaining = limit - spent;
+    
     document.getElementById('summary-limit').textContent = formatCurrency(limit);
+    // Memberi warna merah pada pengeluaran agar lebih menonjol
     document.getElementById('summary-spent').textContent = formatCurrency(spent);
     document.getElementById('summary-remaining').textContent = formatCurrency(remaining);
 }
@@ -110,7 +114,7 @@ async function renderExpenseHistory() {
     historyEl.innerHTML = '';
     const categories = await getCategories();
     const categoryMap = new Map(categories.map(cat => [cat.id, cat.name]));
-    expenses.slice(0, 10).forEach(exp => {
+    expenses.slice(0, 15).forEach(exp => { // Tampilkan 15 terakhir
         const item = document.createElement('div');
         item.className = "flex justify-between items-center text-sm";
         item.innerHTML = `
@@ -118,25 +122,12 @@ async function renderExpenseHistory() {
                 <p class="font-semibold">${exp.description || 'Pengeluaran'}</p>
                 <p class="text-xs text-gray-500">${categoryMap.get(exp.categoryId) || 'Lainnya'}</p>
             </div>
-            <span class="font-semibold text-violet-600">${formatCurrency(exp.amount)}</span>`;
+            <span class="font-semibold text-red-500">${formatCurrency(exp.amount)}</span>`;
         historyEl.appendChild(item);
     });
 }
 
-async function populateCategoryDropdown() {
-    const selectEl = document.getElementById('expense-category');
-    const categories = await getCategories();
-    selectEl.innerHTML = '<option value="" disabled selected>Pilih kategori...</option>';
-    categories.forEach(cat => {
-        const option = document.createElement('option');
-        option.value = cat.id;
-        option.textContent = cat.name;
-        selectEl.appendChild(option);
-    });
-}
-
-
-// --- FUNGSI MODAL & FORM HANDLER ---
+// --- Fungsi Modal & Form ---
 function showModal(modalEl) {
     const modalContent = modalEl.querySelector('div');
     document.getElementById('modal-overlay').classList.remove('hidden');
@@ -159,14 +150,35 @@ function hideModal(modalEl) {
     }, 200);
 }
 
-function createCategoryInput() {
+/**
+ * Fungsi baru untuk membuka modal setup & mengisi form dengan data yang ada
+ */
+async function openSetupModal() {
+    const totalBudgetInput = document.getElementById('total-budget');
+    const categoryFieldsContainer = document.getElementById('category-fields');
+    
+    // Ambil data saat ini dari DB
+    const currentBudget = await getConfig('totalBudget');
+    const currentCategories = await getCategories();
+
+    // Isi form
+    totalBudgetInput.value = currentBudget || '';
+    categoryFieldsContainer.innerHTML = ''; // Kosongkan field kategori lama
+    currentCategories.forEach(cat => {
+        createCategoryInput(cat.name, cat.limit); // Panggil dengan data
+    });
+
+    showModal(document.getElementById('setup-modal'));
+}
+
+function createCategoryInput(name = '', limit = '') {
     const container = document.getElementById('category-fields');
     const fieldWrapper = document.createElement('div');
     fieldWrapper.className = 'flex gap-2 items-center';
     fieldWrapper.innerHTML = `
-        <input type="text" name="category_name" class="w-2/3 p-2 border border-violet-200 rounded-lg" placeholder="Nama Kategori" required>
-        <input type="number" name="category_limit" class="w-1/3 p-2 border border-violet-200 rounded-lg" placeholder="Limit" required>
-        <button type="button" class="text-red-500 remove-cat-btn">&times;</button>`;
+        <input type="text" name="category_name" class="w-2/3 p-2 border border-violet-200 rounded-lg" placeholder="Nama Kategori" value="${name}" required>
+        <input type="number" name="category_limit" class="w-1/3 p-2 border border-violet-200 rounded-lg" placeholder="Limit" value="${limit}" required>
+        <button type="button" class="text-red-500 remove-cat-btn p-1">&times;</button>`;
     container.appendChild(fieldWrapper);
     fieldWrapper.querySelector('.remove-cat-btn').addEventListener('click', () => fieldWrapper.remove());
 }
@@ -174,7 +186,7 @@ function createCategoryInput() {
 async function handleSetupForm(e) {
     e.preventDefault();
     const totalBudget = parseFloat(document.getElementById('total-budget').value);
-    if (isNaN(totalBudget) || totalBudget <= 0) {
+    if (isNaN(totalBudget) || totalBudget < 0) { // Izinkan 0 untuk reset budget
         alert('Total anggaran harus diisi dengan angka yang valid.');
         return;
     }
@@ -196,9 +208,7 @@ async function handleSetupForm(e) {
     }
     await setConfig('totalBudget', totalBudget);
     await clearCategories();
-    for (const cat of categories) {
-        await addCategory(cat);
-    }
+    for (const cat of categories) { await addCategory(cat); }
     hideModal(document.getElementById('setup-modal'));
     await renderUI();
 }
@@ -218,32 +228,39 @@ async function handleExpenseForm(e) {
     await renderUI();
 }
 
-/**
- * Fungsi baru untuk menangani reset data
- */
 async function handleDataReset() {
-    console.log('Resetting all application data...');
     await resetDatabase();
     hideModal(document.getElementById('confirm-reset-modal'));
-    await renderUI();
-    console.log('Data reset successfully.');
+    await renderUI(); // Re-render UI yang sekarang akan kosong
 }
 
-
+// --- Fungsi Bantuan & PWA ---
 async function checkIfInitialSetupNeeded() {
     const budget = await getConfig('totalBudget');
-    const setupModal = document.getElementById('setup-modal');
-    const closeBtn = document.getElementById('close-setup-modal');
-    if (!budget || budget === 0) {
-        showModal(setupModal);
-        closeBtn.classList.add('hidden');
+    if (budget === null) { // Hanya tampilkan jika belum pernah di-setup sama sekali
+        openSetupModal();
+        document.getElementById('close-setup-modal').classList.add('hidden');
     } else {
-        closeBtn.classList.remove('hidden');
+        document.getElementById('close-setup-modal').classList.remove('hidden');
     }
 }
 
+async function populateCategoryDropdown() {
+    const selectEl = document.getElementById('expense-category');
+    const categories = await getCategories();
+    selectEl.innerHTML = '<option value="" disabled selected>Pilih kategori...</option>';
+    categories.forEach(cat => {
+        const option = document.createElement('option');
+        option.value = cat.id;
+        option.textContent = cat.name;
+        selectEl.appendChild(option);
+    });
+}
 
-// --- PWA ---
+function registerServiceWorker() { /* ... kode sama ... */ }
+function initPwaInstall() { /* ... kode sama ... */ }
+
+// Kode PWA (tidak berubah dari versi sebelumnya)
 function registerServiceWorker() {
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
@@ -253,7 +270,6 @@ function registerServiceWorker() {
         });
     }
 }
-
 let deferredPrompt;
 function initPwaInstall() {
     window.addEventListener('beforeinstallprompt', (e) => {
@@ -372,26 +388,23 @@ async function resetDatabase() {
 [file gambar: isi tidak ditampilkan]
 
 ===== ./index.html =====
+<!-- index.html -->
 <!DOCTYPE html>
 <html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dompet Damai</title>
+    <title>Budgeting PWA</title>
     
-    <!-- PWA Manifest & Theme -->
     <link rel="manifest" href="./manifest.json">
-    <meta name="theme-color" content="#8b5cf6"> <!-- Violet 500 -->
+    <meta name="theme-color" content="#8b5cf6">
     
-    <!-- Tailwind CSS Play CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Google Fonts: Poppins -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     
-    <!-- Custom Style untuk tema -->
     <style>
         body { font-family: 'Poppins', sans-serif; }
         ::-webkit-scrollbar { width: 8px; }
@@ -400,25 +413,21 @@ async function resetDatabase() {
         ::-webkit-scrollbar-thumb:hover { background: #8b5cf6; }
     </style>
     
-    <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/idb@7/build/umd.js"></script>
+    <!-- Pastikan utils.js dimuat sebelum app.js -->
+    <script src="./utils.js" defer></script>
     <script src="./db.js" defer></script>
     <script src="./app.js" defer></script>
 </head>
 <body class="bg-violet-50 text-gray-800">
 
-    <!-- Kontainer Utama -->
     <div id="app-container" class="max-w-md mx-auto p-4 min-h-screen">
-        
-        <!-- Header -->
         <header class="text-center my-6">
-            <h1 class="text-3xl font-bold text-violet-700">Dompet Damai</h1>
+            <h1 class="text-3xl font-bold text-violet-700">Budgeting PWA</h1>
             <p class="text-violet-600">Catat pengeluaran, tenangkan pikiran.</p>
         </header>
 
-        <!-- Main Content -->
         <main id="main-content" class="space-y-6">
-             <!-- Ringkasan Anggaran (Responsif) -->
             <section id="summary-card" class="bg-white p-5 rounded-2xl shadow-md space-y-4">
                  <h2 class="text-lg font-semibold text-violet-800 border-b pb-2 mb-4">Ringkasan Bulan Ini</h2>
                  <div class="flex flex-col space-y-4 sm:space-y-0 sm:grid sm:grid-cols-3 sm:gap-4">
@@ -428,16 +437,15 @@ async function resetDatabase() {
                      </div>
                      <div class="flex sm:flex-col justify-between items-center sm:items-start sm:text-center p-2 rounded-lg">
                          <p class="text-sm text-gray-500">Terpakai</p>
-                         <p id="summary-spent" class="font-bold text-lg text-violet-600">Rp 0</p>
+                         <p id="summary-spent" class="font-bold text-lg text-red-500">Rp 0</p>
                      </div>
                      <div class="flex sm:flex-col justify-between items-center sm:items-start sm:text-center p-2 rounded-lg">
                          <p class="text-sm text-gray-500">Sisa</p>
-                         <p id="summary-remaining" class="font-bold text-lg text-violet-600">Rp 0</p>
+                         <p id="summary-remaining" class="font-bold text-lg text-green-600">Rp 0</p>
                      </div>
                  </div>
             </section>
             
-            <!-- Daftar Kategori -->
             <section id="category-section" class="bg-white p-5 rounded-2xl shadow-md">
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-lg font-semibold text-violet-800">Alokasi Dana</h2>
@@ -446,14 +454,22 @@ async function resetDatabase() {
                 <div id="category-list" class="space-y-4"></div>
             </section>
             
-             <!-- Riwayat Pengeluaran -->
             <section id="history-section" class="bg-white p-5 rounded-2xl shadow-md">
                  <h2 class="text-lg font-semibold text-violet-800 mb-4">Riwayat Pengeluaran</h2>
                  <div id="expense-history" class="space-y-3 max-h-60 overflow-y-auto"></div>
             </section>
+
+            <!-- Bagian Ekspor Data (Baru) -->
+            <section id="export-section" class="bg-white p-5 rounded-2xl shadow-md">
+                 <h2 class="text-lg font-semibold text-violet-800 mb-4">Opsi Data</h2>
+                 <p class="text-sm text-gray-500 mb-4">Simpan cadangan data Anda secara lokal.</p>
+                 <div class="flex gap-4">
+                    <button id="export-json-btn" class="w-full py-2 bg-violet-100 text-violet-700 font-semibold rounded-lg hover:bg-violet-200 transition">Ekspor JSON</button>
+                    <button id="export-csv-btn" class="w-full py-2 bg-violet-100 text-violet-700 font-semibold rounded-lg hover:bg-violet-200 transition">Ekspor CSV</button>
+                 </div>
+            </section>
         </main>
 
-        <!-- Floating Action Button -->
         <div class="fixed bottom-6 right-6">
             <button id="add-expense-button" class="bg-violet-500 text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-3xl font-light hover:bg-violet-600 transition-transform transform hover:scale-110">+</button>
         </div>
@@ -461,11 +477,9 @@ async function resetDatabase() {
         <footer id="install-container" class="text-center p-4"></footer>
     </div>
 
-    <!-- ========= MODALS ========= -->
-    <!-- Modal Overlay -->
+    <!-- MODALS -->
     <div id="modal-overlay" class="fixed inset-0 bg-black bg-opacity-40 hidden z-40"></div>
     
-    <!-- Modal Setup Anggaran -->
     <div id="setup-modal" class="fixed inset-0 flex items-center justify-center p-4 hidden z-50">
         <div class="bg-violet-50 w-full max-w-sm p-6 rounded-2xl shadow-xl space-y-4 transform transition-all scale-95 opacity-0">
              <h3 class="text-xl font-semibold text-violet-800">Atur Anggaran</h3>
@@ -485,14 +499,12 @@ async function resetDatabase() {
                     <button type="submit" class="w-full py-2 bg-violet-500 text-white rounded-lg">Simpan</button>
                  </div>
              </form>
-             <!-- Tombol Reset Data (Baru) -->
              <div class="text-center pt-4">
                 <button id="reset-data-button" class="text-sm text-red-600 hover:text-red-800">Reset Semua Data Aplikasi</button>
              </div>
         </div>
     </div>
     
-    <!-- Modal Tambah Pengeluaran -->
     <div id="expense-modal" class="fixed inset-0 flex items-center justify-center p-4 hidden z-50">
         <div class="bg-violet-50 w-full max-w-sm p-6 rounded-2xl shadow-xl space-y-4 transform transition-all scale-95 opacity-0">
             <h3 class="text-xl font-semibold text-violet-800">Catat Pengeluaran</h3>
@@ -517,7 +529,6 @@ async function resetDatabase() {
         </div>
     </div>
     
-    <!-- Modal Konfirmasi Reset (Baru) -->
     <div id="confirm-reset-modal" class="fixed inset-0 flex items-center justify-center p-4 hidden z-50">
         <div class="bg-white w-full max-w-sm p-6 rounded-2xl shadow-xl space-y-4 text-center transform transition-all scale-95 opacity-0">
             <h3 class="text-xl font-semibold text-red-600">Anda Yakin?</h3>
@@ -564,9 +575,9 @@ export:
 	@echo "Listing file sudah diekspor ke listing.txt"
 ===== ./manifest.json =====
 {
-  "name": "Dompet Damai: Anggaran Pribadi",
-  "short_name": "Dompet Damai",
-  "description": "Aplikasi pelacak pengeluaran yang simpel, manis, dan bekerja offline.",
+  "name": "Budgeting PWA",
+  "short_name": "Budgeting",
+  "description": "Aplikasi pelacak pengeluaran yang simpel, dan bekerja offline.",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#f5f3ff",
@@ -589,12 +600,14 @@ export:
 }
 
 ===== ./service-worker.js =====
-const CACHE_NAME = 'dompet-damai-cache-v5'; // Versi dinaikkan
+// service-worker.js
+const CACHE_NAME = 'dompet-damai-cache-v6';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
     './db.js',
     './app.js',
+    './utils.js', // Memastikan utils.js di-cache
     './manifest.json',
     'https://cdn.tailwindcss.com',
     'https://cdn.jsdelivr.net/npm/idb@7/build/umd.js',
@@ -603,40 +616,57 @@ const ASSETS_TO_CACHE = [
     './icons/icon-512x512.png'
 ];
 
+// Event: Install
+// Menyimpan semua aset penting ke dalam cache saat service worker diinstal.
 self.addEventListener('install', event => {
     event.waitUntil(
         caches.open(CACHE_NAME)
-            .then(cache => cache.addAll(ASSETS_TO_CACHE))
+            .then(cache => {
+                console.log('Caching essential assets.');
+                return cache.addAll(ASSETS_TO_CACHE);
+            })
     );
-    self.skipWaiting();
+    self.skipWaiting(); // Memaksa service worker baru untuk aktif segera.
 });
 
+// Event: Activate
+// Membersihkan cache lama yang sudah tidak terpakai.
 self.addEventListener('activate', event => {
     event.waitUntil(
         caches.keys().then(cacheNames => {
             return Promise.all(
                 cacheNames.map(cache => {
                     if (cache !== CACHE_NAME) {
+                        console.log('Deleting old cache:', cache);
                         return caches.delete(cache);
                     }
                 })
             );
         })
     );
-    return self.clients.claim();
+    return self.clients.claim(); // Mengambil kontrol halaman yang terbuka.
 });
 
+// Event: Fetch
+// Menentukan bagaimana aplikasi merespon permintaan jaringan.
+// Strategi: Network First, Fallback to Cache.
 self.addEventListener('fetch', event => {
+    // Abaikan request selain GET
     if (event.request.method !== 'GET') return;
     
     event.respondWith(
+        // Coba ambil dari jaringan terlebih dahulu
         fetch(event.request).catch(() => {
+            // Jika gagal (misalnya, offline), cari di dalam cache.
             return caches.match(event.request);
         })
     );
 });
-
 ===== ./utils.js =====
+/**
+ * utils.js - Berisi fungsi bantuan seperti format mata uang dan ekspor data.
+ */
+
 // Fungsi untuk memformat angka menjadi format mata uang Rupiah
 function formatCurrency(amount) {
     return new Intl.NumberFormat('id-ID', {
@@ -646,21 +676,28 @@ function formatCurrency(amount) {
     }).format(amount);
 }
 
-// Fungsi untuk mengekspor data ke format JSON
+// Fungsi untuk mengekspor semua data ke format JSON
 async function exportToJSON() {
     try {
-        const budget = await getConfig('monthlyBudget') || 0;
+        const totalBudget = await getConfig('totalBudget') || 0;
         const categories = await getCategories();
-        const transactions = await getTransactions();
+        const expenses = await getExpenses();
 
-        const data = {
-            targetAnggaranBulanan: budget,
-            kategori: categories,
-            riwayatPemasukan: transactions,
-            dieksporPada: new Date().toISOString()
+        const dataToExport = {
+            pengaturan: {
+                totalAnggaran: totalBudget,
+                dieksporPada: new Date().toISOString()
+            },
+            kategori: categories.map(c => ({ nama: c.name, limit: c.limit })),
+            riwayatPengeluaran: expenses.map(e => ({
+                jumlah: e.amount,
+                id_kategori: e.categoryId,
+                deskripsi: e.description,
+                tanggal: e.date
+            }))
         };
 
-        const jsonString = JSON.stringify(data, null, 2);
+        const jsonString = JSON.stringify(dataToExport, null, 2);
         const blob = new Blob([jsonString], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
 
@@ -671,6 +708,7 @@ async function exportToJSON() {
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
+        console.log('Ekspor JSON berhasil.');
 
     } catch (error) {
         console.error('Gagal mengekspor data ke JSON:', error);
@@ -678,30 +716,37 @@ async function exportToJSON() {
     }
 }
 
-
-// Fungsi untuk mengekspor data ke format CSV
+// Fungsi untuk mengekspor riwayat pengeluaran ke format CSV
 async function exportToCSV() {
     try {
-        const categories = await getCategories();
-        if (categories.length === 0) {
-            alert('Tidak ada data kategori untuk diekspor.');
+        const expenses = await getExpenses();
+        if (expenses.length === 0) {
+            alert('Tidak ada riwayat pengeluaran untuk diekspor.');
             return;
         }
+        
+        const categories = await getCategories();
+        const categoryMap = new Map(categories.map(cat => [cat.id, cat.name]));
 
         let csvContent = "data:text/csv;charset=utf-8,";
-        csvContent += "ID Kategori,Nama Kategori,Target Alokasi,Teralokasi\r\n"; // Header CSV
+        // Header CSV
+        csvContent += "Tanggal,Kategori,Deskripsi,Jumlah\r\n";
 
-        categories.forEach(cat => {
-            csvContent += `${cat.id},"${cat.name}",${cat.target},${cat.allocated}\r\n`;
+        expenses.forEach(exp => {
+            const date = new Date(exp.date).toLocaleString('id-ID');
+            const categoryName = categoryMap.get(exp.categoryId) || 'Tidak Diketahui';
+            const description = exp.description ? `"${exp.description.replace(/"/g, '""')}"` : '';
+            csvContent += `${date},${categoryName},${description},${exp.amount}\r\n`;
         });
 
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
         link.setAttribute("href", encodedUri);
-        link.setAttribute("download", `dompet-damai-kategori-${new Date().toISOString().slice(0, 10)}.csv`);
+        link.setAttribute("download", `riwayat-pengeluaran-${new Date().toISOString().slice(0, 10)}.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        console.log('Ekspor CSV berhasil.');
 
     } catch (error) {
         console.error('Gagal mengekspor data ke CSV:', error);
