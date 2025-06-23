@@ -1,69 +1,343 @@
 ===== ./app.js =====
-const BASE = '/pwa';
+// app.js - Logika Utama Aplikasi Budgeting
 
-registerSW();
+document.addEventListener('DOMContentLoaded', () => {
+    // Registrasi Service Worker & Inisialisasi PWA
+    registerServiceWorker();
+    initPwaInstall();
 
-function registerSW() {
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register(`${BASE}/sw.js`)
-    .then(() => {
-      updateSWStatus('✅ Service Worker terdaftar');
-    })
-    .catch(err => {
-      updateSWStatus('❌ Gagal daftar SW: ' + err.message);
+    // --- Seleksi Elemen DOM ---
+    const setupButton = document.getElementById('setup-button');
+    const addExpenseButton = document.getElementById('add-expense-button');
+    
+    // Modal Setup
+    const setupModal = document.getElementById('setup-modal');
+    const closeSetupModalBtn = document.getElementById('close-setup-modal');
+    const setupForm = document.getElementById('setup-form');
+    const addCategoryFieldBtn = document.getElementById('add-category-field-button');
+
+    // Modal Expense
+    const expenseModal = document.getElementById('expense-modal');
+    const closeExpenseModalBtn = document.getElementById('close-expense-modal');
+    const expenseForm = document.getElementById('expense-form');
+    
+    // Modal Reset (Baru)
+    const resetDataBtn = document.getElementById('reset-data-button');
+    const confirmResetModal = document.getElementById('confirm-reset-modal');
+    const cancelResetBtn = document.getElementById('cancel-reset-btn');
+    const confirmResetBtn = document.getElementById('confirm-reset-btn');
+
+    const modalOverlay = document.getElementById('modal-overlay');
+
+    // --- Event Listeners ---
+    setupButton.addEventListener('click', () => showModal(setupModal));
+    addExpenseButton.addEventListener('click', () => showModal(expenseModal));
+    
+    [closeSetupModalBtn, closeExpenseModalBtn, modalOverlay, cancelResetBtn].forEach(el => {
+        el.addEventListener('click', () => {
+            hideModal(setupModal);
+            hideModal(expenseModal);
+            hideModal(confirmResetModal);
+        });
     });
-  } else {
-    updateSWStatus('⚠️ Service Worker tidak didukung browser');
-  }
 
-  updateOnlineStatus();
-  window.addEventListener('online', updateOnlineStatus);
-  window.addEventListener('offline', updateOnlineStatus);
-}
-
-function updateOnlineStatus() {
-  const statusEl = document.getElementById('online-status');
-  statusEl.textContent = navigator.onLine ? '🌐 Online' : '🚫 Offline';
-}
-
-function updateSWStatus(text) {
-  const swStatusEl = document.getElementById('sw-status');
-  swStatusEl.textContent = text;
-}
-
-// ======= Tambahan untuk fitur install prompt =======
-let deferredPrompt;
-
-window.addEventListener('beforeinstallprompt', (e) => {
-  // Cegah browser memunculkan prompt default
-  e.preventDefault();
-  deferredPrompt = e;
-
-  // Buat tombol install manual
-  const installButton = document.createElement('button');
-  installButton.textContent = 'Pasang ke Perangkat';
-  installButton.style.marginTop = '20px';
-  installButton.style.padding = '10px 20px';
-  installButton.style.fontSize = '1rem';
-  installButton.style.cursor = 'pointer';
-
-  const infoDiv = document.getElementById('pwa-info');
-  infoDiv.appendChild(installButton);
-
-  installButton.addEventListener('click', () => {
-    installButton.remove();
-    deferredPrompt.prompt();
-
-    deferredPrompt.userChoice.then(choice => {
-      if (choice.outcome === 'accepted') {
-        console.log('Pengguna menyetujui pemasangan.');
-      } else {
-        console.log('Pengguna membatalkan pemasangan.');
-      }
-      deferredPrompt = null;
+    addCategoryFieldBtn.addEventListener('click', createCategoryInput);
+    setupForm.addEventListener('submit', handleSetupForm);
+    expenseForm.addEventListener('submit', handleExpenseForm);
+    
+    // Listeners untuk Reset (Baru)
+    resetDataBtn.addEventListener('click', () => {
+        hideModal(setupModal); // Sembunyikan modal setup
+        showModal(confirmResetModal); // Tampilkan modal konfirmasi
     });
-  });
+    confirmResetBtn.addEventListener('click', handleDataReset);
+    
+    // --- Inisialisasi Aplikasi ---
+    renderUI();
 });
+
+// ... (Sisa fungsi renderUI, renderSummary, renderCategories, dll. tetap sama) ...
+async function renderUI() {
+    await renderSummary();
+    await renderCategories();
+    await renderExpenseHistory();
+    await populateCategoryDropdown();
+    checkIfInitialSetupNeeded();
+}
+
+async function renderSummary() {
+    const limit = await getConfig('totalBudget') || 0;
+    const allExpenses = await getExpenses();
+    const spent = allExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+    const remaining = limit - spent;
+    document.getElementById('summary-limit').textContent = formatCurrency(limit);
+    document.getElementById('summary-spent').textContent = formatCurrency(spent);
+    document.getElementById('summary-remaining').textContent = formatCurrency(remaining);
+}
+
+async function renderCategories() {
+    const categoryListEl = document.getElementById('category-list');
+    const categories = await getCategories();
+    if (categories.length === 0) {
+        categoryListEl.innerHTML = `<p class="text-center text-gray-500 text-sm">Belum ada kategori. Klik 'Atur' untuk memulai.</p>`;
+        return;
+    }
+    categoryListEl.innerHTML = '';
+    for (const cat of categories) {
+        const expensesForCat = await getExpensesByCategoryId(cat.id);
+        const spentOnCat = expensesForCat.reduce((sum, exp) => sum + exp.amount, 0);
+        const progress = cat.limit > 0 ? (spentOnCat / cat.limit) * 100 : 0;
+        const item = document.createElement('div');
+        item.innerHTML = `
+            <div class="flex justify-between items-center mb-1">
+                <span class="font-semibold text-gray-700">${cat.name}</span>
+                <span class="text-sm text-gray-500">${formatCurrency(spentOnCat)} / ${formatCurrency(cat.limit)}</span>
+            </div>
+            <div class="w-full bg-violet-100 rounded-full h-2.5">
+                <div class="bg-gradient-to-r from-purple-300 to-violet-500 h-2.5 rounded-full" style="width: ${Math.min(100, progress)}%"></div>
+            </div>`;
+        categoryListEl.appendChild(item);
+    }
+}
+
+async function renderExpenseHistory() {
+    const historyEl = document.getElementById('expense-history');
+    const expenses = (await getExpenses()).reverse();
+    if (expenses.length === 0) {
+        historyEl.innerHTML = `<p class="text-center text-gray-500 text-sm">Belum ada pengeluaran.</p>`;
+        return;
+    }
+    historyEl.innerHTML = '';
+    const categories = await getCategories();
+    const categoryMap = new Map(categories.map(cat => [cat.id, cat.name]));
+    expenses.slice(0, 10).forEach(exp => {
+        const item = document.createElement('div');
+        item.className = "flex justify-between items-center text-sm";
+        item.innerHTML = `
+            <div>
+                <p class="font-semibold">${exp.description || 'Pengeluaran'}</p>
+                <p class="text-xs text-gray-500">${categoryMap.get(exp.categoryId) || 'Lainnya'}</p>
+            </div>
+            <span class="font-semibold text-violet-600">${formatCurrency(exp.amount)}</span>`;
+        historyEl.appendChild(item);
+    });
+}
+
+async function populateCategoryDropdown() {
+    const selectEl = document.getElementById('expense-category');
+    const categories = await getCategories();
+    selectEl.innerHTML = '<option value="" disabled selected>Pilih kategori...</option>';
+    categories.forEach(cat => {
+        const option = document.createElement('option');
+        option.value = cat.id;
+        option.textContent = cat.name;
+        selectEl.appendChild(option);
+    });
+}
+
+
+// --- FUNGSI MODAL & FORM HANDLER ---
+function showModal(modalEl) {
+    const modalContent = modalEl.querySelector('div');
+    document.getElementById('modal-overlay').classList.remove('hidden');
+    modalEl.classList.remove('hidden');
+    setTimeout(() => {
+        modalContent.classList.remove('scale-95', 'opacity-0');
+        modalContent.classList.add('scale-100', 'opacity-100');
+    }, 10);
+}
+
+function hideModal(modalEl) {
+    const modalContent = modalEl.querySelector('div');
+    modalContent.classList.remove('scale-100', 'opacity-100');
+    modalContent.classList.add('scale-95', 'opacity-0');
+    setTimeout(() => {
+         modalEl.classList.add('hidden');
+         if (modalEl.id === 'confirm-reset-modal') {
+             document.getElementById('modal-overlay').classList.add('hidden');
+         }
+    }, 200);
+}
+
+function createCategoryInput() {
+    const container = document.getElementById('category-fields');
+    const fieldWrapper = document.createElement('div');
+    fieldWrapper.className = 'flex gap-2 items-center';
+    fieldWrapper.innerHTML = `
+        <input type="text" name="category_name" class="w-2/3 p-2 border border-violet-200 rounded-lg" placeholder="Nama Kategori" required>
+        <input type="number" name="category_limit" class="w-1/3 p-2 border border-violet-200 rounded-lg" placeholder="Limit" required>
+        <button type="button" class="text-red-500 remove-cat-btn">&times;</button>`;
+    container.appendChild(fieldWrapper);
+    fieldWrapper.querySelector('.remove-cat-btn').addEventListener('click', () => fieldWrapper.remove());
+}
+
+async function handleSetupForm(e) {
+    e.preventDefault();
+    const totalBudget = parseFloat(document.getElementById('total-budget').value);
+    if (isNaN(totalBudget) || totalBudget <= 0) {
+        alert('Total anggaran harus diisi dengan angka yang valid.');
+        return;
+    }
+    const categoryNames = document.querySelectorAll('input[name="category_name"]');
+    const categoryLimits = document.querySelectorAll('input[name="category_limit"]');
+    let totalLimit = 0;
+    const categories = [];
+    for (let i = 0; i < categoryNames.length; i++) {
+        const name = categoryNames[i].value.trim();
+        const limit = parseFloat(categoryLimits[i].value);
+        if (name && !isNaN(limit) && limit > 0) {
+            totalLimit += limit;
+            categories.push({ name, limit });
+        }
+    }
+    if (totalLimit > totalBudget) {
+        alert('Total limit kategori tidak boleh melebihi total anggaran bulanan!');
+        return;
+    }
+    await setConfig('totalBudget', totalBudget);
+    await clearCategories();
+    for (const cat of categories) {
+        await addCategory(cat);
+    }
+    hideModal(document.getElementById('setup-modal'));
+    await renderUI();
+}
+
+async function handleExpenseForm(e) {
+    e.preventDefault();
+    const amount = parseFloat(document.getElementById('expense-amount').value);
+    const categoryId = parseInt(document.getElementById('expense-category').value, 10);
+    const description = document.getElementById('expense-desc').value.trim();
+    if (isNaN(amount) || amount <= 0 || isNaN(categoryId)) {
+        alert('Mohon isi jumlah dan kategori dengan benar.');
+        return;
+    }
+    await addExpense({ amount, categoryId, description, date: new Date().toISOString() });
+    document.getElementById('expense-form').reset();
+    hideModal(document.getElementById('expense-modal'));
+    await renderUI();
+}
+
+/**
+ * Fungsi baru untuk menangani reset data
+ */
+async function handleDataReset() {
+    console.log('Resetting all application data...');
+    await resetDatabase();
+    hideModal(document.getElementById('confirm-reset-modal'));
+    await renderUI();
+    console.log('Data reset successfully.');
+}
+
+
+async function checkIfInitialSetupNeeded() {
+    const budget = await getConfig('totalBudget');
+    const setupModal = document.getElementById('setup-modal');
+    const closeBtn = document.getElementById('close-setup-modal');
+    if (!budget || budget === 0) {
+        showModal(setupModal);
+        closeBtn.classList.add('hidden');
+    } else {
+        closeBtn.classList.remove('hidden');
+    }
+}
+
+
+// --- PWA ---
+function registerServiceWorker() {
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./service-worker.js')
+                .then(reg => console.log('Service Worker terdaftar.', reg))
+                .catch(err => console.error('Gagal mendaftarkan Service Worker:', err));
+        });
+    }
+}
+
+let deferredPrompt;
+function initPwaInstall() {
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        const installContainer = document.getElementById('install-container');
+        installContainer.innerHTML = '';
+        const installButton = document.createElement('button');
+        installButton.textContent = 'Pasang Aplikasi Dompet Damai';
+        installButton.className = 'px-4 py-2 bg-violet-500 text-white font-semibold rounded-lg shadow-md hover:bg-violet-600 transition';
+        installContainer.appendChild(installButton);
+        installButton.addEventListener('click', () => {
+            installButton.style.display = 'none';
+            deferredPrompt.prompt();
+            deferredPrompt.userChoice.then(() => { deferredPrompt = null; });
+        });
+    });
+}
+
+===== ./db.js =====
+// db.js - Skema Database Baru untuk Pelacakan Pengeluaran
+
+const DB_NAME = 'DompetDamaiDB-v2';
+const DB_VERSION = 1;
+const STORES = {
+    CONFIG: 'config',
+    CATEGORIES: 'categories',
+    EXPENSES: 'expenses'
+};
+
+let db;
+
+async function initDB() {
+    if (db) return db;
+
+    db = await idb.openDB(DB_NAME, DB_VERSION, {
+        upgrade(db) {
+            if (!db.objectStoreNames.contains(STORES.CONFIG)) {
+                db.createObjectStore(STORES.CONFIG, { keyPath: 'key' });
+            }
+            if (!db.objectStoreNames.contains(STORES.CATEGORIES)) {
+                db.createObjectStore(STORES.CATEGORIES, { keyPath: 'id', autoIncrement: true });
+            }
+            if (!db.objectStoreNames.contains(STORES.EXPENSES)) {
+                const expenseStore = db.createObjectStore(STORES.EXPENSES, { keyPath: 'id', autoIncrement: true });
+                expenseStore.createIndex('by_category', 'categoryId');
+                expenseStore.createIndex('by_date', 'date');
+            }
+        },
+    });
+    console.log('Database initialized successfully.');
+    return db;
+}
+
+// --- Fungsi Config ---
+async function setConfig(key, value) { return (await initDB()).put(STORES.CONFIG, { key, value }); }
+async function getConfig(key) {
+    const result = await (await initDB()).get(STORES.CONFIG, key);
+    return result ? result.value : null;
+}
+
+// --- Fungsi Categories ---
+async function clearCategories() { return (await initDB()).clear(STORES.CATEGORIES); }
+async function addCategory(category) { return (await initDB()).add(STORES.CATEGORIES, category); }
+async function getCategories() { return (await initDB()).getAll(STORES.CATEGORIES); }
+
+// --- Fungsi Expenses ---
+async function addExpense(expense) { return (await initDB()).add(STORES.EXPENSES, expense); }
+async function getExpenses() { return (await initDB()).getAllFromIndex(STORES.EXPENSES, 'by_date'); }
+async function getExpensesByCategoryId(categoryId) { return (await initDB()).getAllFromIndex(STORES.EXPENSES, 'by_category', categoryId); }
+
+
+// --- FUNGSI RESET BARU ---
+/**
+ * Menghapus semua data dari semua object store.
+ */
+async function resetDatabase() {
+    const db = await initDB();
+    return Promise.all([
+        db.clear(STORES.CONFIG),
+        db.clear(STORES.CATEGORIES),
+        db.clear(STORES.EXPENSES)
+    ]);
+}
 
 ===== ./.gitignore =====
 
@@ -101,32 +375,160 @@ window.addEventListener('beforeinstallprompt', (e) => {
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Profile PWA - Revalidate Strategy</title>
-  <link rel="manifest" href="/pwa/manifest.json" />
-  <meta name="theme-color" content="#0077cc" />
-
-  <link rel="stylesheet" href="style.css" />
-  <script defer src="app.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dompet Damai</title>
+    
+    <!-- PWA Manifest & Theme -->
+    <link rel="manifest" href="./manifest.json">
+    <meta name="theme-color" content="#8b5cf6"> <!-- Violet 500 -->
+    
+    <!-- Tailwind CSS Play CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts: Poppins -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Custom Style untuk tema -->
+    <style>
+        body { font-family: 'Poppins', sans-serif; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f5f3ff; }
+        ::-webkit-scrollbar-thumb { background: #a78bfa; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #8b5cf6; }
+    </style>
+    
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/idb@7/build/umd.js"></script>
+    <script src="./db.js" defer></script>
+    <script src="./app.js" defer></script>
 </head>
-<body>
-  <div class="container">
-    <h1>Profile</h1>
-    <ul class="bio">
-      <li><strong>NIM:</strong> 225410001</li>
-      <li><strong>Nama:</strong> Gilang Teja Krishna</li>
-      <li><strong>Universitas:</strong> UTDI</li>
-      <li><strong>Role:</strong> Tech Architect</li>
-    </ul>
+<body class="bg-violet-50 text-gray-800">
 
-    <div id="pwa-info">
-      <h2>Info PWA</h2>
-      <p><strong>Strategi Caching:</strong> <span id="strategy">Revalidate</span></p>
-      <p><strong>Status Koneksi:</strong> <span id="online-status">Memeriksa...</span></p>
-      <p><strong>Status Service Worker:</strong> <span id="sw-status">Memeriksa...</span></p>
+    <!-- Kontainer Utama -->
+    <div id="app-container" class="max-w-md mx-auto p-4 min-h-screen">
+        
+        <!-- Header -->
+        <header class="text-center my-6">
+            <h1 class="text-3xl font-bold text-violet-700">Dompet Damai</h1>
+            <p class="text-violet-600">Catat pengeluaran, tenangkan pikiran.</p>
+        </header>
+
+        <!-- Main Content -->
+        <main id="main-content" class="space-y-6">
+             <!-- Ringkasan Anggaran (Responsif) -->
+            <section id="summary-card" class="bg-white p-5 rounded-2xl shadow-md space-y-4">
+                 <h2 class="text-lg font-semibold text-violet-800 border-b pb-2 mb-4">Ringkasan Bulan Ini</h2>
+                 <div class="flex flex-col space-y-4 sm:space-y-0 sm:grid sm:grid-cols-3 sm:gap-4">
+                     <div class="flex sm:flex-col justify-between items-center sm:items-start sm:text-center p-2 rounded-lg">
+                         <p class="text-sm text-gray-500">Anggaran</p>
+                         <p id="summary-limit" class="font-bold text-lg text-violet-600">Rp 0</p>
+                     </div>
+                     <div class="flex sm:flex-col justify-between items-center sm:items-start sm:text-center p-2 rounded-lg">
+                         <p class="text-sm text-gray-500">Terpakai</p>
+                         <p id="summary-spent" class="font-bold text-lg text-violet-600">Rp 0</p>
+                     </div>
+                     <div class="flex sm:flex-col justify-between items-center sm:items-start sm:text-center p-2 rounded-lg">
+                         <p class="text-sm text-gray-500">Sisa</p>
+                         <p id="summary-remaining" class="font-bold text-lg text-violet-600">Rp 0</p>
+                     </div>
+                 </div>
+            </section>
+            
+            <!-- Daftar Kategori -->
+            <section id="category-section" class="bg-white p-5 rounded-2xl shadow-md">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-lg font-semibold text-violet-800">Alokasi Dana</h2>
+                    <button id="setup-button" class="text-violet-600 font-semibold text-sm">+ Atur</button>
+                </div>
+                <div id="category-list" class="space-y-4"></div>
+            </section>
+            
+             <!-- Riwayat Pengeluaran -->
+            <section id="history-section" class="bg-white p-5 rounded-2xl shadow-md">
+                 <h2 class="text-lg font-semibold text-violet-800 mb-4">Riwayat Pengeluaran</h2>
+                 <div id="expense-history" class="space-y-3 max-h-60 overflow-y-auto"></div>
+            </section>
+        </main>
+
+        <!-- Floating Action Button -->
+        <div class="fixed bottom-6 right-6">
+            <button id="add-expense-button" class="bg-violet-500 text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-3xl font-light hover:bg-violet-600 transition-transform transform hover:scale-110">+</button>
+        </div>
+        
+        <footer id="install-container" class="text-center p-4"></footer>
     </div>
-  </div>
+
+    <!-- ========= MODALS ========= -->
+    <!-- Modal Overlay -->
+    <div id="modal-overlay" class="fixed inset-0 bg-black bg-opacity-40 hidden z-40"></div>
+    
+    <!-- Modal Setup Anggaran -->
+    <div id="setup-modal" class="fixed inset-0 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-violet-50 w-full max-w-sm p-6 rounded-2xl shadow-xl space-y-4 transform transition-all scale-95 opacity-0">
+             <h3 class="text-xl font-semibold text-violet-800">Atur Anggaran</h3>
+             <form id="setup-form" class="space-y-4">
+                 <div>
+                     <label for="total-budget" class="text-sm font-medium text-gray-600">Total Anggaran Bulanan</label>
+                     <input type="number" id="total-budget" class="mt-1 w-full p-2 border border-violet-200 rounded-lg focus:ring-violet-500 focus:border-violet-500" placeholder="5000000">
+                 </div>
+                 <hr>
+                 <div class="flex justify-between items-center">
+                    <h4 class="text-lg font-semibold text-violet-700">Kategori</h4>
+                    <button type="button" id="add-category-field-button" class="text-sm bg-violet-200 text-violet-800 px-3 py-1 rounded-full">+ Tambah</button>
+                 </div>
+                 <div id="category-fields" class="space-y-2 max-h-40 overflow-y-auto"></div>
+                 <div class="flex gap-4 pt-4 border-t mt-4">
+                    <button type="button" id="close-setup-modal" class="w-full py-2 bg-gray-200 text-gray-700 rounded-lg">Batal</button>
+                    <button type="submit" class="w-full py-2 bg-violet-500 text-white rounded-lg">Simpan</button>
+                 </div>
+             </form>
+             <!-- Tombol Reset Data (Baru) -->
+             <div class="text-center pt-4">
+                <button id="reset-data-button" class="text-sm text-red-600 hover:text-red-800">Reset Semua Data Aplikasi</button>
+             </div>
+        </div>
+    </div>
+    
+    <!-- Modal Tambah Pengeluaran -->
+    <div id="expense-modal" class="fixed inset-0 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-violet-50 w-full max-w-sm p-6 rounded-2xl shadow-xl space-y-4 transform transition-all scale-95 opacity-0">
+            <h3 class="text-xl font-semibold text-violet-800">Catat Pengeluaran</h3>
+            <form id="expense-form" class="space-y-4">
+                 <div>
+                     <label for="expense-amount" class="text-sm font-medium text-gray-600">Jumlah</label>
+                     <input type="number" id="expense-amount" class="mt-1 w-full p-2 border border-violet-200 rounded-lg" required>
+                 </div>
+                 <div>
+                     <label for="expense-category" class="text-sm font-medium text-gray-600">Pilih Kategori</label>
+                     <select id="expense-category" class="mt-1 w-full p-2 border border-violet-200 rounded-lg bg-white" required></select>
+                 </div>
+                 <div>
+                     <label for="expense-desc" class="text-sm font-medium text-gray-600">Deskripsi (Opsional)</label>
+                     <input type="text" id="expense-desc" class="mt-1 w-full p-2 border border-violet-200 rounded-lg" placeholder="Makan siang">
+                 </div>
+                 <div class="flex gap-4 pt-4">
+                    <button type="button" id="close-expense-modal" class="w-full py-2 bg-gray-200 text-gray-700 rounded-lg">Batal</button>
+                    <button type="submit" class="w-full py-2 bg-violet-500 text-white rounded-lg">Catat</button>
+                 </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Modal Konfirmasi Reset (Baru) -->
+    <div id="confirm-reset-modal" class="fixed inset-0 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-white w-full max-w-sm p-6 rounded-2xl shadow-xl space-y-4 text-center transform transition-all scale-95 opacity-0">
+            <h3 class="text-xl font-semibold text-red-600">Anda Yakin?</h3>
+            <p class="text-gray-600">Semua data anggaran, kategori, dan riwayat pengeluaran akan dihapus permanen. Tindakan ini tidak dapat dibatalkan.</p>
+            <div class="flex gap-4 pt-4">
+                <button type="button" id="cancel-reset-btn" class="w-full py-2 bg-gray-200 text-gray-700 rounded-lg">Batal</button>
+                <button type="button" id="confirm-reset-btn" class="w-full py-2 bg-red-500 text-white rounded-lg">Ya, Hapus Semua</button>
+            </div>
+        </div>
+    </div>
+
 </body>
 </html>
 
@@ -162,338 +564,148 @@ export:
 	@echo "Listing file sudah diekspor ke listing.txt"
 ===== ./manifest.json =====
 {
-  "name": "PWA Profile",
-  "short_name": "Profile PWA",
-  "description": "Profil Mahasiswa PWA Offline-ready",
-  "start_url": "/pwa/",
+  "name": "Dompet Damai: Anggaran Pribadi",
+  "short_name": "Dompet Damai",
+  "description": "Aplikasi pelacak pengeluaran yang simpel, manis, dan bekerja offline.",
+  "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#fefefe",
-  "theme_color": "#0077cc",
-  "orientation": "portrait",
+  "background_color": "#f5f3ff",
+  "theme_color": "#8b5cf6",
+  "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "/pwa/icons/icon-48x48.png",
-      "sizes": "48x48",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/pwa/icons/icon-72x72.png",
-      "sizes": "72x72",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/pwa/icons/icon-96x96.png",
-      "sizes": "96x96",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/pwa/icons/icon-128x128.png",
-      "sizes": "128x128",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/pwa/icons/icon-144x144.png",
-      "sizes": "144x144",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/pwa/icons/icon-152x152.png",
-      "sizes": "152x152",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/pwa/icons/icon-192x192.png",
+      "src": "./icons/icon-192x192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/pwa/icons/icon-256x256.png",
-      "sizes": "256x256",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/pwa/icons/icon-384x384.png",
-      "sizes": "384x384",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/pwa/icons/icon-512x512.png",
+      "src": "./icons/icon-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
     }
   ]
 }
-===== ./offline.html =====
-<!-- pwa-profile/index.html -->
 
-<!DOCTYPE html>
-<html lang="id">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Profile PWA - Revalidate Strategy</title>
-  <link rel="manifest" href="/manifest.json" />
-  <meta name="theme-color" content="#0077cc" />
-  <link rel="stylesheet" href="style.css" />
-  <script defer src="app.js"></script>
-</head>
-<body>
-  <div class="container">
-    <h1>Profile On Offline Mode</h1>
-    <ul class="bio">
-      <li><strong>NIM:</strong> 225410001</li>
-      <li><strong>Nama:</strong> Gilang Teja Krishna</li>
-      <li><strong>Universitas:</strong> UTDI</li>
-      <li><strong>Role:</strong> Tech Architect</li>
-    </ul>
-
-    <div id="pwa-info">
-      <h2>Info PWA</h2>
-      <p><strong>Strategi Caching:</strong> <span id="strategy">Revalidate</span></p>
-      <p><strong>Status Koneksi:</strong> <span id="online-status">Memeriksa...</span></p>
-      <p><strong>Status Service Worker:</strong> <span id="sw-status">Memeriksa...</span></p>
-    </div>
-  </div>
-</body>
-</html>
-
-===== ./style.css =====
-/* pwa-profile/style.css */
-
-:root {
-  --primary: #111827;
-  --secondary: #6b7280;
-  --accent: #3b82f6;
-  --accent-light: #bfdbfe;
-  --bg: #fefefe;
-  --card-bg: #ffffff;
-  --shadow-light: 0 8px 24px rgba(59, 130, 246, 0.15);
-  --radius: 20px;
-  --transition: 0.3s ease;
-}
-
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
-body {
-  font-family: 'Poppins', 'Segoe UI', Roboto, sans-serif;
-  background-color: var(--bg);
-  color: var(--primary);
-  min-height: 100vh;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 40px 20px;
-  transition: background-color var(--transition);
-}
-
-.container {
-  width: 100%;
-  max-width: 520px;
-  background: var(--card-bg);
-  padding: 36px 32px;
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-light);
-  text-align: center;
-  position: relative;
-}
-
-h1 {
-  font-weight: 700;
-  font-size: 2.4rem;
-  margin-bottom: 24px;
-  letter-spacing: 1px;
-  color: var(--primary);
-  user-select: none;
-}
-
-h2 {
-  font-weight: 600;
-  font-size: 1.4rem;
-  margin-top: 40px;
-  margin-bottom: 16px;
-  color: var(--accent);
-}
-
-img {
-  border-radius: 50%;
-  width: 140px;
-  height: 140px;
-  object-fit: cover;
-  margin: 0 auto 24px;
-  box-shadow: 0 16px 40px rgba(59, 130, 246, 0.3);
-  transition: transform var(--transition);
-  cursor: pointer;
-}
-img:hover {
-  transform: scale(1.05);
-}
-
-.bio {
-  list-style: none;
-  margin-top: 0;
-  padding-left: 0;
-  text-align: left;
-  color: var(--secondary);
-  font-size: 1.1rem;
-  line-height: 1.5;
-  user-select: text;
-}
-
-.bio li {
-  padding: 14px 0;
-  border-bottom: 1px solid #e4e7eb;
-  transition: color var(--transition);
-}
-
-.bio li:last-child {
-  border-bottom: none;
-}
-
-.bio li strong {
-  color: var(--primary);
-  font-weight: 600;
-}
-
-#repo {
-  margin-top: 30px;
-  text-align: left;
-  background: var(--accent-light);
-  padding: 20px 24px;
-  border-radius: 16px;
-  color: var(--primary);
-  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.1);
-  font-size: 1rem;
-  user-select: text;
-}
-
-#repo p {
-  margin-bottom: 10px;
-}
-
-#repo a {
-  color: var(--accent);
-  font-weight: 700;
-  text-decoration: none;
-  border-bottom: 2px solid transparent;
-  transition: border-color var(--transition);
-}
-
-#repo a:hover {
-  border-color: var(--accent);
-}
-
-output {
-  margin-top: 28px;
-  display: block;
-  font-size: 0.9rem;
-  color: var(--secondary);
-  user-select: none;
-}
-
-/* Responsive */
-@media (max-width: 480px) {
-  body {
-    padding: 30px 16px;
-  }
-  .container {
-    padding: 28px 20px;
-  }
-  h1 {
-    font-size: 2rem;
-  }
-  h2 {
-    font-size: 1.2rem;
-  }
-  img {
-    width: 110px;
-    height: 110px;
-  }
-  .bio li {
-    font-size: 1rem;
-    padding: 10px 0;
-  }
-  #repo {
-    font-size: 0.9rem;
-  }
-}
-
-===== ./sw.js =====
-const BASE = '/pwa';
-const CACHE_NAME = 'pwa-revalidate-v1';
+===== ./service-worker.js =====
+const CACHE_NAME = 'dompet-damai-cache-v5'; // Versi dinaikkan
 const ASSETS_TO_CACHE = [
-  `${BASE}/`,
-  `${BASE}/index.html`,
-  `${BASE}/style.css`,
-  `${BASE}/app.js`,
-  `${BASE}/offline.html`
+    './',
+    './index.html',
+    './db.js',
+    './app.js',
+    './manifest.json',
+    'https://cdn.tailwindcss.com',
+    'https://cdn.jsdelivr.net/npm/idb@7/build/umd.js',
+    'https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap',
+    './icons/icon-192x192.png',
+    './icons/icon-512x512.png'
 ];
 
-// Cache asset saat install
 self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      return cache.addAll(ASSETS_TO_CACHE);
-    })
-  );
-  self.skipWaiting();
+    event.waitUntil(
+        caches.open(CACHE_NAME)
+            .then(cache => cache.addAll(ASSETS_TO_CACHE))
+    );
+    self.skipWaiting();
 });
 
-// Bersihkan cache lama saat activate
 self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(
-        keys.map(key => {
-          if (key !== CACHE_NAME) {
-            return caches.delete(key);
-          }
+    event.waitUntil(
+        caches.keys().then(cacheNames => {
+            return Promise.all(
+                cacheNames.map(cache => {
+                    if (cache !== CACHE_NAME) {
+                        return caches.delete(cache);
+                    }
+                })
+            );
         })
-      )
-    )
-  );
-  self.clients.claim();
+    );
+    return self.clients.claim();
 });
 
-// Tangani fetch dan fallback ke offline.html
 self.addEventListener('fetch', event => {
-  // Abaikan request non-GET
-  if (event.request.method !== 'GET') return;
+    if (event.request.method !== 'GET') return;
+    
+    event.respondWith(
+        fetch(event.request).catch(() => {
+            return caches.match(event.request);
+        })
+    );
+});
 
-  event.respondWith(
-    fetch(event.request)
-      .then(networkResponse => {
-        // Update cache dengan response terbaru
-        caches.open(CACHE_NAME).then(cache => {
-          cache.put(event.request, networkResponse.clone());
-        });
-        return networkResponse.clone();
-      })
-      .catch(async () => {
-        const cache = await caches.open(CACHE_NAME);
+===== ./utils.js =====
+// Fungsi untuk memformat angka menjadi format mata uang Rupiah
+function formatCurrency(amount) {
+    return new Intl.NumberFormat('id-ID', {
+        style: 'currency',
+        currency: 'IDR',
+        minimumFractionDigits: 0
+    }).format(amount);
+}
 
-        // Fallback ke offline.html kalau request HTML
-        const acceptHeader = event.request.headers.get('accept') || '';
-        if (acceptHeader.includes('text/html')) {
-          return cache.match(`${BASE}/offline.html`);
+// Fungsi untuk mengekspor data ke format JSON
+async function exportToJSON() {
+    try {
+        const budget = await getConfig('monthlyBudget') || 0;
+        const categories = await getCategories();
+        const transactions = await getTransactions();
+
+        const data = {
+            targetAnggaranBulanan: budget,
+            kategori: categories,
+            riwayatPemasukan: transactions,
+            dieksporPada: new Date().toISOString()
+        };
+
+        const jsonString = JSON.stringify(data, null, 2);
+        const blob = new Blob([jsonString], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `dompet-damai-backup-${new Date().toISOString().slice(0, 10)}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+    } catch (error) {
+        console.error('Gagal mengekspor data ke JSON:', error);
+        alert('Gagal mengekspor data.');
+    }
+}
+
+
+// Fungsi untuk mengekspor data ke format CSV
+async function exportToCSV() {
+    try {
+        const categories = await getCategories();
+        if (categories.length === 0) {
+            alert('Tidak ada data kategori untuk diekspor.');
+            return;
         }
 
-        // Kalau bukan HTML, coba cari file yang cocok di cache
-        return cache.match(event.request);
-      })
-  );
-});
+        let csvContent = "data:text/csv;charset=utf-8,";
+        csvContent += "ID Kategori,Nama Kategori,Target Alokasi,Teralokasi\r\n"; // Header CSV
+
+        categories.forEach(cat => {
+            csvContent += `${cat.id},"${cat.name}",${cat.target},${cat.allocated}\r\n`;
+        });
+
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `dompet-damai-kategori-${new Date().toISOString().slice(0, 10)}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+    } catch (error) {
+        console.error('Gagal mengekspor data ke CSV:', error);
+        alert('Gagal mengekspor data.');
+    }
+}
 

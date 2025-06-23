@@ -1,35 +1,32 @@
 // app.js - Logika Utama Aplikasi Budgeting
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Registrasi Service Worker & Inisialisasi PWA
-    registerServiceWorker();
-    initPwaInstall();
-
     // --- Seleksi Elemen DOM ---
     const setupButton = document.getElementById('setup-button');
     const addExpenseButton = document.getElementById('add-expense-button');
-    
-    // Modal Setup
     const setupModal = document.getElementById('setup-modal');
-    const closeSetupModalBtn = document.getElementById('close-setup-modal');
-    const setupForm = document.getElementById('setup-form');
-    const addCategoryFieldBtn = document.getElementById('add-category-field-button');
-
-    // Modal Expense
     const expenseModal = document.getElementById('expense-modal');
-    const closeExpenseModalBtn = document.getElementById('close-expense-modal');
-    const expenseForm = document.getElementById('expense-form');
-    
-    // Modal Reset (Baru)
-    const resetDataBtn = document.getElementById('reset-data-button');
     const confirmResetModal = document.getElementById('confirm-reset-modal');
-    const cancelResetBtn = document.getElementById('cancel-reset-btn');
-    const confirmResetBtn = document.getElementById('confirm-reset-btn');
-
     const modalOverlay = document.getElementById('modal-overlay');
 
+    // Form
+    const setupForm = document.getElementById('setup-form');
+    const expenseForm = document.getElementById('expense-form');
+    
+    // Tombol Modal
+    const closeSetupModalBtn = document.getElementById('close-setup-modal');
+    const closeExpenseModalBtn = document.getElementById('close-expense-modal');
+    const addCategoryFieldBtn = document.getElementById('add-category-field-button');
+    
+    // Tombol Aksi
+    const resetDataBtn = document.getElementById('reset-data-button');
+    const cancelResetBtn = document.getElementById('cancel-reset-btn');
+    const confirmResetBtn = document.getElementById('confirm-reset-btn');
+    const exportJsonBtn = document.getElementById('export-json-btn');
+    const exportCsvBtn = document.getElementById('export-csv-btn');
+
     // --- Event Listeners ---
-    setupButton.addEventListener('click', () => showModal(setupModal));
+    setupButton.addEventListener('click', openSetupModal); // Menggunakan fungsi baru
     addExpenseButton.addEventListener('click', () => showModal(expenseModal));
     
     [closeSetupModalBtn, closeExpenseModalBtn, modalOverlay, cancelResetBtn].forEach(el => {
@@ -40,22 +37,27 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    addCategoryFieldBtn.addEventListener('click', createCategoryInput);
+    addCategoryFieldBtn.addEventListener('click', () => createCategoryInput());
     setupForm.addEventListener('submit', handleSetupForm);
     expenseForm.addEventListener('submit', handleExpenseForm);
     
-    // Listeners untuk Reset (Baru)
     resetDataBtn.addEventListener('click', () => {
-        hideModal(setupModal); // Sembunyikan modal setup
-        showModal(confirmResetModal); // Tampilkan modal konfirmasi
+        hideModal(setupModal);
+        showModal(confirmResetModal);
     });
     confirmResetBtn.addEventListener('click', handleDataReset);
+
+    // Event listener untuk tombol ekspor
+    exportJsonBtn.addEventListener('click', exportToJSON);
+    exportCsvBtn.addEventListener('click', exportToCSV);
     
-    // --- Inisialisasi Aplikasi ---
+    // --- Inisialisasi ---
+    registerServiceWorker();
+    initPwaInstall();
     renderUI();
 });
 
-// ... (Sisa fungsi renderUI, renderSummary, renderCategories, dll. tetap sama) ...
+// --- Fungsi Utama Render ---
 async function renderUI() {
     await renderSummary();
     await renderCategories();
@@ -67,9 +69,11 @@ async function renderUI() {
 async function renderSummary() {
     const limit = await getConfig('totalBudget') || 0;
     const allExpenses = await getExpenses();
-    const spent = allExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+    const spent = allExpenses.reduce((sum, exp) => sum + exp.amount, 0);
     const remaining = limit - spent;
+    
     document.getElementById('summary-limit').textContent = formatCurrency(limit);
+    // Memberi warna merah pada pengeluaran agar lebih menonjol
     document.getElementById('summary-spent').textContent = formatCurrency(spent);
     document.getElementById('summary-remaining').textContent = formatCurrency(remaining);
 }
@@ -109,7 +113,7 @@ async function renderExpenseHistory() {
     historyEl.innerHTML = '';
     const categories = await getCategories();
     const categoryMap = new Map(categories.map(cat => [cat.id, cat.name]));
-    expenses.slice(0, 10).forEach(exp => {
+    expenses.slice(0, 15).forEach(exp => { // Tampilkan 15 terakhir
         const item = document.createElement('div');
         item.className = "flex justify-between items-center text-sm";
         item.innerHTML = `
@@ -117,25 +121,12 @@ async function renderExpenseHistory() {
                 <p class="font-semibold">${exp.description || 'Pengeluaran'}</p>
                 <p class="text-xs text-gray-500">${categoryMap.get(exp.categoryId) || 'Lainnya'}</p>
             </div>
-            <span class="font-semibold text-violet-600">${formatCurrency(exp.amount)}</span>`;
+            <span class="font-semibold text-red-500">${formatCurrency(exp.amount)}</span>`;
         historyEl.appendChild(item);
     });
 }
 
-async function populateCategoryDropdown() {
-    const selectEl = document.getElementById('expense-category');
-    const categories = await getCategories();
-    selectEl.innerHTML = '<option value="" disabled selected>Pilih kategori...</option>';
-    categories.forEach(cat => {
-        const option = document.createElement('option');
-        option.value = cat.id;
-        option.textContent = cat.name;
-        selectEl.appendChild(option);
-    });
-}
-
-
-// --- FUNGSI MODAL & FORM HANDLER ---
+// --- Fungsi Modal & Form ---
 function showModal(modalEl) {
     const modalContent = modalEl.querySelector('div');
     document.getElementById('modal-overlay').classList.remove('hidden');
@@ -158,14 +149,35 @@ function hideModal(modalEl) {
     }, 200);
 }
 
-function createCategoryInput() {
+/**
+ * Fungsi baru untuk membuka modal setup & mengisi form dengan data yang ada
+ */
+async function openSetupModal() {
+    const totalBudgetInput = document.getElementById('total-budget');
+    const categoryFieldsContainer = document.getElementById('category-fields');
+    
+    // Ambil data saat ini dari DB
+    const currentBudget = await getConfig('totalBudget');
+    const currentCategories = await getCategories();
+
+    // Isi form
+    totalBudgetInput.value = currentBudget || '';
+    categoryFieldsContainer.innerHTML = ''; // Kosongkan field kategori lama
+    currentCategories.forEach(cat => {
+        createCategoryInput(cat.name, cat.limit); // Panggil dengan data
+    });
+
+    showModal(document.getElementById('setup-modal'));
+}
+
+function createCategoryInput(name = '', limit = '') {
     const container = document.getElementById('category-fields');
     const fieldWrapper = document.createElement('div');
     fieldWrapper.className = 'flex gap-2 items-center';
     fieldWrapper.innerHTML = `
-        <input type="text" name="category_name" class="w-2/3 p-2 border border-violet-200 rounded-lg" placeholder="Nama Kategori" required>
-        <input type="number" name="category_limit" class="w-1/3 p-2 border border-violet-200 rounded-lg" placeholder="Limit" required>
-        <button type="button" class="text-red-500 remove-cat-btn">&times;</button>`;
+        <input type="text" name="category_name" class="w-2/3 p-2 border border-violet-200 rounded-lg" placeholder="Nama Kategori" value="${name}" required>
+        <input type="number" name="category_limit" class="w-1/3 p-2 border border-violet-200 rounded-lg" placeholder="Limit" value="${limit}" required>
+        <button type="button" class="text-red-500 remove-cat-btn p-1">&times;</button>`;
     container.appendChild(fieldWrapper);
     fieldWrapper.querySelector('.remove-cat-btn').addEventListener('click', () => fieldWrapper.remove());
 }
@@ -173,7 +185,7 @@ function createCategoryInput() {
 async function handleSetupForm(e) {
     e.preventDefault();
     const totalBudget = parseFloat(document.getElementById('total-budget').value);
-    if (isNaN(totalBudget) || totalBudget <= 0) {
+    if (isNaN(totalBudget) || totalBudget < 0) { // Izinkan 0 untuk reset budget
         alert('Total anggaran harus diisi dengan angka yang valid.');
         return;
     }
@@ -195,9 +207,7 @@ async function handleSetupForm(e) {
     }
     await setConfig('totalBudget', totalBudget);
     await clearCategories();
-    for (const cat of categories) {
-        await addCategory(cat);
-    }
+    for (const cat of categories) { await addCategory(cat); }
     hideModal(document.getElementById('setup-modal'));
     await renderUI();
 }
@@ -217,32 +227,39 @@ async function handleExpenseForm(e) {
     await renderUI();
 }
 
-/**
- * Fungsi baru untuk menangani reset data
- */
 async function handleDataReset() {
-    console.log('Resetting all application data...');
     await resetDatabase();
     hideModal(document.getElementById('confirm-reset-modal'));
-    await renderUI();
-    console.log('Data reset successfully.');
+    await renderUI(); // Re-render UI yang sekarang akan kosong
 }
 
-
+// --- Fungsi Bantuan & PWA ---
 async function checkIfInitialSetupNeeded() {
     const budget = await getConfig('totalBudget');
-    const setupModal = document.getElementById('setup-modal');
-    const closeBtn = document.getElementById('close-setup-modal');
-    if (!budget || budget === 0) {
-        showModal(setupModal);
-        closeBtn.classList.add('hidden');
+    if (budget === null) { // Hanya tampilkan jika belum pernah di-setup sama sekali
+        openSetupModal();
+        document.getElementById('close-setup-modal').classList.add('hidden');
     } else {
-        closeBtn.classList.remove('hidden');
+        document.getElementById('close-setup-modal').classList.remove('hidden');
     }
 }
 
+async function populateCategoryDropdown() {
+    const selectEl = document.getElementById('expense-category');
+    const categories = await getCategories();
+    selectEl.innerHTML = '<option value="" disabled selected>Pilih kategori...</option>';
+    categories.forEach(cat => {
+        const option = document.createElement('option');
+        option.value = cat.id;
+        option.textContent = cat.name;
+        selectEl.appendChild(option);
+    });
+}
 
-// --- PWA ---
+function registerServiceWorker() { /* ... kode sama ... */ }
+function initPwaInstall() { /* ... kode sama ... */ }
+
+// Kode PWA (tidak berubah dari versi sebelumnya)
 function registerServiceWorker() {
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
@@ -252,7 +269,6 @@ function registerServiceWorker() {
         });
     }
 }
-
 let deferredPrompt;
 function initPwaInstall() {
     window.addEventListener('beforeinstallprompt', (e) => {

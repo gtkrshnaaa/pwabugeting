@@ -1,3 +1,7 @@
+/**
+ * utils.js - Berisi fungsi bantuan seperti format mata uang dan ekspor data.
+ */
+
 // Fungsi untuk memformat angka menjadi format mata uang Rupiah
 function formatCurrency(amount) {
     return new Intl.NumberFormat('id-ID', {
@@ -7,21 +11,28 @@ function formatCurrency(amount) {
     }).format(amount);
 }
 
-// Fungsi untuk mengekspor data ke format JSON
+// Fungsi untuk mengekspor semua data ke format JSON
 async function exportToJSON() {
     try {
-        const budget = await getConfig('monthlyBudget') || 0;
+        const totalBudget = await getConfig('totalBudget') || 0;
         const categories = await getCategories();
-        const transactions = await getTransactions();
+        const expenses = await getExpenses();
 
-        const data = {
-            targetAnggaranBulanan: budget,
-            kategori: categories,
-            riwayatPemasukan: transactions,
-            dieksporPada: new Date().toISOString()
+        const dataToExport = {
+            pengaturan: {
+                totalAnggaran: totalBudget,
+                dieksporPada: new Date().toISOString()
+            },
+            kategori: categories.map(c => ({ nama: c.name, limit: c.limit })),
+            riwayatPengeluaran: expenses.map(e => ({
+                jumlah: e.amount,
+                id_kategori: e.categoryId,
+                deskripsi: e.description,
+                tanggal: e.date
+            }))
         };
 
-        const jsonString = JSON.stringify(data, null, 2);
+        const jsonString = JSON.stringify(dataToExport, null, 2);
         const blob = new Blob([jsonString], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
 
@@ -32,6 +43,7 @@ async function exportToJSON() {
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
+        console.log('Ekspor JSON berhasil.');
 
     } catch (error) {
         console.error('Gagal mengekspor data ke JSON:', error);
@@ -39,30 +51,37 @@ async function exportToJSON() {
     }
 }
 
-
-// Fungsi untuk mengekspor data ke format CSV
+// Fungsi untuk mengekspor riwayat pengeluaran ke format CSV
 async function exportToCSV() {
     try {
-        const categories = await getCategories();
-        if (categories.length === 0) {
-            alert('Tidak ada data kategori untuk diekspor.');
+        const expenses = await getExpenses();
+        if (expenses.length === 0) {
+            alert('Tidak ada riwayat pengeluaran untuk diekspor.');
             return;
         }
+        
+        const categories = await getCategories();
+        const categoryMap = new Map(categories.map(cat => [cat.id, cat.name]));
 
         let csvContent = "data:text/csv;charset=utf-8,";
-        csvContent += "ID Kategori,Nama Kategori,Target Alokasi,Teralokasi\r\n"; // Header CSV
+        // Header CSV
+        csvContent += "Tanggal,Kategori,Deskripsi,Jumlah\r\n";
 
-        categories.forEach(cat => {
-            csvContent += `${cat.id},"${cat.name}",${cat.target},${cat.allocated}\r\n`;
+        expenses.forEach(exp => {
+            const date = new Date(exp.date).toLocaleString('id-ID');
+            const categoryName = categoryMap.get(exp.categoryId) || 'Tidak Diketahui';
+            const description = exp.description ? `"${exp.description.replace(/"/g, '""')}"` : '';
+            csvContent += `${date},${categoryName},${description},${exp.amount}\r\n`;
         });
 
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
         link.setAttribute("href", encodedUri);
-        link.setAttribute("download", `dompet-damai-kategori-${new Date().toISOString().slice(0, 10)}.csv`);
+        link.setAttribute("download", `riwayat-pengeluaran-${new Date().toISOString().slice(0, 10)}.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        console.log('Ekspor CSV berhasil.');
 
     } catch (error) {
         console.error('Gagal mengekspor data ke CSV:', error);
