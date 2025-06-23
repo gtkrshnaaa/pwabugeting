@@ -1,19 +1,20 @@
-const CACHE_NAME = 'dompet-damai-v1';
+// service-worker.js
+
+const CACHE_NAME = 'dompet-damai-v1.1'; // Naikkan versi cache
 const ASSETS_TO_CACHE = [
-    '/',
-    '/index.html',
-    '/style.css',
-    '/app.js',
-    '/db.js',
-    '/utils.js',
+    './',
+    './index.html',
+    './style.css',
+    './app.js',
+    './db.js',
+    './utils.js',
     'https://cdn.jsdelivr.net/npm/idb@7/build/umd.js',
-    '/manifest.json',
-    '/icons/icon-192x192.png',
-    '/icons/icon-512x512.png'
+    './manifest.json',
+    './icons/icon-192x192.png',
+    './icons/icon-512x512.png'
 ];
 
 // Event: Install
-// Caching aset-aset inti aplikasi
 self.addEventListener('install', event => {
     event.waitUntil(
         caches.open(CACHE_NAME)
@@ -29,7 +30,6 @@ self.addEventListener('install', event => {
 });
 
 // Event: Activate
-// Membersihkan cache lama yang tidak terpakai
 self.addEventListener('activate', event => {
     event.waitUntil(
         caches.keys().then(cacheNames => {
@@ -47,31 +47,22 @@ self.addEventListener('activate', event => {
 });
 
 // Event: Fetch
-// Menggunakan strategi Cache First untuk aset aplikasi
 self.addEventListener('fetch', event => {
-    // Hanya tangani request GET
     if (event.request.method !== 'GET') return;
 
     event.respondWith(
         caches.match(event.request)
             .then(cachedResponse => {
-                // Jika ada di cache, langsung kembalikan dari cache
+                // Jika ada di cache, langsung kembalikan
                 if (cachedResponse) {
                     return cachedResponse;
                 }
 
-                // Jika tidak ada di cache, coba ambil dari network
-                return fetch(event.request).then(
-                    networkResponse => {
-                        // Tidak perlu menyimpan response ke cache di sini
-                        // karena semua aset penting sudah di-cache saat instalasi
-                        return networkResponse;
-                    }
-                ).catch(() => {
-                    // Jika request navigasi (halaman HTML) gagal,
-                    // kembalikan index.html sebagai fallback (untuk SPA)
+                // Jika tidak, ambil dari network
+                return fetch(event.request).catch(() => {
+                    // Jika request navigasi HTML gagal, fallback ke index.html
                     if (event.request.mode === 'navigate') {
-                        return caches.match('/index.html');
+                        return caches.match('./index.html');
                     }
                 });
             })
