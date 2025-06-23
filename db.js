@@ -1,3 +1,4 @@
+// ===== ./db.js =====
 // db.js - Skema Database Baru untuk Pelacakan Pengeluaran
 
 const DB_NAME = 'DompetDamaiDB-v2';
@@ -43,6 +44,9 @@ async function getConfig(key) {
 async function clearCategories() { return (await initDB()).clear(STORES.CATEGORIES); }
 async function addCategory(category) { return (await initDB()).add(STORES.CATEGORIES, category); }
 async function getCategories() { return (await initDB()).getAll(STORES.CATEGORIES); }
+async function updateCategory(category) { return (await initDB()).put(STORES.CATEGORIES, category); }
+async function deleteCategory(id) { return (await initDB()).delete(STORES.CATEGORIES, id); }
+
 
 // --- Fungsi Expenses ---
 async function addExpense(expense) { return (await initDB()).add(STORES.EXPENSES, expense); }
