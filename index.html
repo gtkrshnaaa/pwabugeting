@@ -1,31 +1,129 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Profile PWA - Revalidate Strategy</title>
-  <link rel="manifest" href="/pwa/manifest.json" />
-  <meta name="theme-color" content="#0077cc" />
-
-  <link rel="stylesheet" href="style.css" />
-  <script defer src="app.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dompet Damai - Anggaran Pribadi</title>
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#10b981">
+    
+    <!-- Styles and Fonts -->
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/idb@7/build/umd.js"></script>
+    <script src="db.js" defer></script>
+    <script src="utils.js" defer></script>
+    <script src="app.js" defer></script>
 </head>
 <body>
-  <div class="container">
-    <h1>Profile</h1>
-    <ul class="bio">
-      <li><strong>NIM:</strong> 225410001</li>
-      <li><strong>Nama:</strong> Gilang Teja Krishna</li>
-      <li><strong>Universitas:</strong> UTDI</li>
-      <li><strong>Role:</strong> Tech Architect</li>
-    </ul>
+    <div class="container">
+        <header>
+            <h1>Dompet Damai</h1>
+            <p>Perencana anggaran pribadi Anda yang bekerja offline.</p>
+        </header>
 
-    <div id="pwa-info">
-      <h2>Info PWA</h2>
-      <p><strong>Strategi Caching:</strong> <span id="strategy">Revalidate</span></p>
-      <p><strong>Status Koneksi:</strong> <span id="online-status">Memeriksa...</span></p>
-      <p><strong>Status Service Worker:</strong> <span id="sw-status">Memeriksa...</span></p>
+        <main>
+            <!-- Bagian Ringkasan Anggaran -->
+            <section class="card">
+                <h2>Ringkasan Anggaran</h2>
+                <div id="budget-summary">
+                    <div>
+                        <span id="summary-target">Rp 0</span>
+                        <div class="label">Target Bulanan</div>
+                    </div>
+                    <div>
+                        <span id="summary-allocated">Rp 0</span>
+                        <div class="label">Sudah Teralokasi</div>
+                    </div>
+                    <div>
+                        <span id="summary-remaining">Rp 0</span>
+                        <div class="label">Sisa Kebutuhan</div>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Bagian Pengaturan -->
+            <section class="card">
+                <h2>Pengaturan</h2>
+                <form id="budget-form">
+                    <div class="form-group">
+                        <label for="monthly-budget">Target Anggaran Bulanan Anda</label>
+                        <input type="number" id="monthly-budget" placeholder="Contoh: 5000000" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Simpan Target</button>
+                </form>
+            </section>
+            
+            <!-- Bagian Alokasi Kategori -->
+            <section class="card">
+                <h2>Alokasi Anggaran</h2>
+                <div id="category-list">
+                    <!-- Daftar kategori akan dimuat di sini oleh JavaScript -->
+                    <p>Belum ada kategori. Silakan tambahkan di bawah.</p>
+                </div>
+                <hr style="margin: 20px 0; border-color: transparent;">
+                <form id="category-form">
+                    <h3>Tambah Kategori Baru</h3>
+                    <div class="form-group">
+                        <label for="category-name">Nama Kategori</label>
+                        <input type="text" id="category-name" placeholder="Contoh: Kebutuhan Pokok" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="category-target">Target Dana</label>
+                        <input type="number" id="category-target" placeholder="Contoh: 2000000" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Tambah Kategori</button>
+                </form>
+            </section>
+
+            <!-- Bagian Input Pemasukan -->
+            <section class="card">
+                <h2>Catat Pemasukan</h2>
+                <form id="transaction-form">
+                     <div class="form-group">
+                        <label for="transaction-amount">Jumlah Pemasukan</label>
+                        <input type="number" id="transaction-amount" placeholder="Contoh: 1000000" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="transaction-desc">Deskripsi (opsional)</label>
+                        <input type="text" id="transaction-desc" placeholder="Contoh: Gaji bulan Juni">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Catat Pemasukan</button>
+                </form>
+            </section>
+
+            <!-- Bagian Riwayat Transaksi -->
+            <section class="card">
+                <h2>Riwayat Pemasukan</h2>
+                <div id="transaction-history">
+                    <p>Belum ada riwayat pemasukan.</p>
+                </div>
+            </section>
+
+             <!-- Bagian Ekspor Data -->
+            <section class="card">
+                <h2>Ekspor Data</h2>
+                <p>Simpan data Anda secara lokal sebagai cadangan.</p>
+                <div class="export-buttons">
+                    <button id="export-json-btn" class="btn btn-secondary">Ekspor ke JSON</button>
+                    <button id="export-csv-btn" class="btn btn-secondary">Ekspor Kategori (CSV)</button>
+                </div>
+            </section>
+
+        </main>
+
+        <footer>
+            <div id="pwa-status">
+                <p>Status Service Worker: <span id="sw-status">Memeriksa...</span></p>
+                <div id="install-container"></div>
+            </div>
+        </footer>
     </div>
-  </div>
 </body>
 </html>
