@@ -1,4 +1,4 @@
-// app.js - Logika Utama Aplikasi Budgeting
+// app.js - Logika Utama Aplikasi Budgeting (Versi Performa Ditingkatkan)
 
 document.addEventListener('DOMContentLoaded', () => {
     // --- Seleksi Elemen DOM ---
@@ -26,7 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const exportCsvBtn = document.getElementById('export-csv-btn');
 
     // --- Event Listeners ---
-    setupButton.addEventListener('click', openSetupModal); // Menggunakan fungsi baru
+    setupButton.addEventListener('click', openSetupModal);
     addExpenseButton.addEventListener('click', () => showModal(expenseModal));
     
     [closeSetupModalBtn, closeExpenseModalBtn, modalOverlay, cancelResetBtn].forEach(el => {
@@ -47,7 +47,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     confirmResetBtn.addEventListener('click', handleDataReset);
 
-    // Event listener untuk tombol ekspor
     exportJsonBtn.addEventListener('click', exportToJSON);
     exportCsvBtn.addEventListener('click', exportToCSV);
     
@@ -57,38 +56,53 @@ document.addEventListener('DOMContentLoaded', () => {
     renderUI();
 });
 
-// --- Fungsi Utama Render ---
+/**
+ * OPTIMASI PERFORMA UTAMA
+ * Fungsi ini mengambil semua data yang diperlukan dari database secara bersamaan.
+ * Data tersebut kemudian diteruskan ke fungsi-fungsi render sebagai argumen,
+ * sehingga menghindari query berulang di setiap fungsi render.
+ */
 async function renderUI() {
-    await renderSummary();
-    await renderCategories();
-    await renderExpenseHistory();
-    await populateCategoryDropdown();
-    checkIfInitialSetupNeeded();
+    const [limit, categories, expenses] = await Promise.all([
+        getConfig('totalBudget'),
+        getCategories(),
+        getExpenses()
+    ]);
+
+    renderSummary(limit, expenses);
+    renderCategories(categories, expenses);
+    renderExpenseHistory(categories, expenses);
+    populateCategoryDropdown(categories);
+    checkIfInitialSetupNeeded(limit);
 }
 
-async function renderSummary() {
-    const limit = await getConfig('totalBudget') || 0;
-    const allExpenses = await getExpenses();
+// Menerima data sebagai argumen, tidak melakukan query sendiri
+function renderSummary(limit = 0, allExpenses = []) {
     const spent = allExpenses.reduce((sum, exp) => sum + exp.amount, 0);
     const remaining = limit - spent;
     
     document.getElementById('summary-limit').textContent = formatCurrency(limit);
-    // Memberi warna merah pada pengeluaran agar lebih menonjol
     document.getElementById('summary-spent').textContent = formatCurrency(spent);
     document.getElementById('summary-remaining').textContent = formatCurrency(remaining);
 }
 
-async function renderCategories() {
+// Menerima data sebagai argumen, tidak melakukan query di dalam loop
+function renderCategories(categories = [], allExpenses = []) {
     const categoryListEl = document.getElementById('category-list');
-    const categories = await getCategories();
     if (categories.length === 0) {
         categoryListEl.innerHTML = `<p class="text-center text-gray-500 text-sm">Belum ada kategori. Klik 'Atur' untuk memulai.</p>`;
         return;
     }
+
+    const spentByCategory = new Map();
+    for (const expense of allExpenses) {
+        const currentSpent = spentByCategory.get(expense.categoryId) || 0;
+        spentByCategory.set(expense.categoryId, currentSpent + expense.amount);
+    }
+
     categoryListEl.innerHTML = '';
     for (const cat of categories) {
-        const expensesForCat = await getExpensesByCategoryId(cat.id);
-        const spentOnCat = expensesForCat.reduce((sum, exp) => sum + exp.amount, 0);
+        const spentOnCat = spentByCategory.get(cat.id) || 0;
         const progress = cat.limit > 0 ? (spentOnCat / cat.limit) * 100 : 0;
         const item = document.createElement('div');
         item.innerHTML = `
@@ -103,17 +117,19 @@ async function renderCategories() {
     }
 }
 
-async function renderExpenseHistory() {
+function renderExpenseHistory(categories = [], expenses = []) {
     const historyEl = document.getElementById('expense-history');
-    const expenses = (await getExpenses()).reverse();
-    if (expenses.length === 0) {
+    const reversedExpenses = [...expenses].reverse();
+
+    if (reversedExpenses.length === 0) {
         historyEl.innerHTML = `<p class="text-center text-gray-500 text-sm">Belum ada pengeluaran.</p>`;
         return;
     }
+
     historyEl.innerHTML = '';
-    const categories = await getCategories();
     const categoryMap = new Map(categories.map(cat => [cat.id, cat.name]));
-    expenses.slice(0, 15).forEach(exp => { // Tampilkan 15 terakhir
+    
+    reversedExpenses.slice(0, 15).forEach(exp => {
         const item = document.createElement('div');
         item.className = "flex justify-between items-center text-sm";
         item.innerHTML = `
@@ -149,23 +165,20 @@ function hideModal(modalEl) {
     }, 200);
 }
 
-/**
- * Fungsi baru untuk membuka modal setup & mengisi form dengan data yang ada
- */
 async function openSetupModal() {
     const totalBudgetInput = document.getElementById('total-budget');
     const categoryFieldsContainer = document.getElementById('category-fields');
     
-    // Ambil data saat ini dari DB
     const currentBudget = await getConfig('totalBudget');
     const currentCategories = await getCategories();
 
-    // Isi form
     totalBudgetInput.value = currentBudget || '';
-    categoryFieldsContainer.innerHTML = ''; // Kosongkan field kategori lama
-    currentCategories.forEach(cat => {
-        createCategoryInput(cat.name, cat.limit); // Panggil dengan data
-    });
+    categoryFieldsContainer.innerHTML = '';
+    if (currentCategories.length > 0) {
+        currentCategories.forEach(cat => createCategoryInput(cat.name, cat.limit));
+    } else {
+        createCategoryInput(); // Buat satu field kosong jika belum ada kategori
+    }
 
     showModal(document.getElementById('setup-modal'));
 }
@@ -185,7 +198,7 @@ function createCategoryInput(name = '', limit = '') {
 async function handleSetupForm(e) {
     e.preventDefault();
     const totalBudget = parseFloat(document.getElementById('total-budget').value);
-    if (isNaN(totalBudget) || totalBudget < 0) { // Izinkan 0 untuk reset budget
+    if (isNaN(totalBudget) || totalBudget < 0) {
         alert('Total anggaran harus diisi dengan angka yang valid.');
         return;
     }
@@ -230,13 +243,12 @@ async function handleExpenseForm(e) {
 async function handleDataReset() {
     await resetDatabase();
     hideModal(document.getElementById('confirm-reset-modal'));
-    await renderUI(); // Re-render UI yang sekarang akan kosong
+    await renderUI();
 }
 
 // --- Fungsi Bantuan & PWA ---
-async function checkIfInitialSetupNeeded() {
-    const budget = await getConfig('totalBudget');
-    if (budget === null) { // Hanya tampilkan jika belum pernah di-setup sama sekali
+function checkIfInitialSetupNeeded(budget) {
+    if (budget === null) {
         openSetupModal();
         document.getElementById('close-setup-modal').classList.add('hidden');
     } else {
@@ -244,9 +256,8 @@ async function checkIfInitialSetupNeeded() {
     }
 }
 
-async function populateCategoryDropdown() {
+function populateCategoryDropdown(categories = []) {
     const selectEl = document.getElementById('expense-category');
-    const categories = await getCategories();
     selectEl.innerHTML = '<option value="" disabled selected>Pilih kategori...</option>';
     categories.forEach(cat => {
         const option = document.createElement('option');
@@ -256,10 +267,6 @@ async function populateCategoryDropdown() {
     });
 }
 
-function registerServiceWorker() { /* ... kode sama ... */ }
-function initPwaInstall() { /* ... kode sama ... */ }
-
-// Kode PWA (tidak berubah dari versi sebelumnya)
 function registerServiceWorker() {
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {

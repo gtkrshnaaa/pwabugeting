@@ -1,9 +1,10 @@
-const CACHE_NAME = 'dompet-damai-cache-v5'; // Versi dinaikkan
+const CACHE_NAME = 'dompet-damai-cache-v7'; // Versi dinaikkan
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
     './db.js',
     './app.js',
+    './utils.js', // Memastikan utils.js di-cache
     './manifest.json',
     'https://cdn.tailwindcss.com',
     'https://cdn.jsdelivr.net/npm/idb@7/build/umd.js',
@@ -15,7 +16,10 @@ const ASSETS_TO_CACHE = [
 self.addEventListener('install', event => {
     event.waitUntil(
         caches.open(CACHE_NAME)
-            .then(cache => cache.addAll(ASSETS_TO_CACHE))
+            .then(cache => {
+                console.log('Caching essential assets for v7.');
+                return cache.addAll(ASSETS_TO_CACHE);
+            })
     );
     self.skipWaiting();
 });
@@ -26,6 +30,7 @@ self.addEventListener('activate', event => {
             return Promise.all(
                 cacheNames.map(cache => {
                     if (cache !== CACHE_NAME) {
+                        console.log('Deleting old cache:', cache);
                         return caches.delete(cache);
                     }
                 })

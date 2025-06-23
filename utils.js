@@ -2,15 +2,6 @@
  * utils.js - Berisi fungsi bantuan seperti format mata uang dan ekspor data.
  */
 
-// Fungsi untuk memformat angka menjadi format mata uang Rupiah
-function formatCurrency(amount) {
-    return new Intl.NumberFormat('id-ID', {
-        style: 'currency',
-        currency: 'IDR',
-        minimumFractionDigits: 0
-    }).format(amount);
-}
-
 // Fungsi untuk mengekspor semua data ke format JSON
 async function exportToJSON() {
     try {
@@ -64,8 +55,7 @@ async function exportToCSV() {
         const categoryMap = new Map(categories.map(cat => [cat.id, cat.name]));
 
         let csvContent = "data:text/csv;charset=utf-8,";
-        // Header CSV
-        csvContent += "Tanggal,Kategori,Deskripsi,Jumlah\r\n";
+        csvContent += "Tanggal,Kategori,Deskripsi,Jumlah\r\n"; // Header CSV
 
         expenses.forEach(exp => {
             const date = new Date(exp.date).toLocaleString('id-ID');
