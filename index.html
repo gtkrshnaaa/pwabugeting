@@ -45,21 +45,24 @@
 
         <!-- Main Content -->
         <main id="main-content" class="space-y-6">
-            <!-- Ringkasan Anggaran -->
+            
+            <!-- Ringkasan Anggaran (Bagian yang Diperbarui) -->
             <section id="summary-card" class="bg-white p-5 rounded-2xl shadow-md space-y-4">
-                 <h2 class="text-lg font-semibold text-violet-800 border-b pb-2">Ringkasan Bulan Ini</h2>
-                 <div class="grid grid-cols-3 gap-4 text-center">
-                     <div>
+                 <h2 class="text-lg font-semibold text-violet-800 border-b pb-2 mb-4">Ringkasan Bulan Ini</h2>
+                 <!-- Div ini sekarang menjadi flexbox vertikal di layar kecil dan grid di layar besar -->
+                 <div class="flex flex-col space-y-4 sm:space-y-0 sm:grid sm:grid-cols-3 sm:gap-4">
+                     <!-- Setiap item dibuat menjadi flexbox untuk alignment yang lebih baik -->
+                     <div class="flex sm:flex-col justify-between items-center sm:items-start sm:text-center p-2 rounded-lg">
                          <p class="text-sm text-gray-500">Anggaran</p>
                          <p id="summary-limit" class="font-bold text-lg text-violet-600">Rp 0</p>
                      </div>
-                     <div>
+                     <div class="flex sm:flex-col justify-between items-center sm:items-start sm:text-center p-2 rounded-lg">
                          <p class="text-sm text-gray-500">Terpakai</p>
-                         <p id="summary-spent" class="font-bold text-lg text-red-500">Rp 0</p>
+                         <p id="summary-spent" class="font-bold text-lg text-violet-600">Rp 0</p> <!-- Warna diubah -->
                      </div>
-                     <div>
+                     <div class="flex sm:flex-col justify-between items-center sm:items-start sm:text-center p-2 rounded-lg">
                          <p class="text-sm text-gray-500">Sisa</p>
-                         <p id="summary-remaining" class="font-bold text-lg text-green-600">Rp 0</p>
+                         <p id="summary-remaining" class="font-bold text-lg text-violet-600">Rp 0</p> <!-- Warna diubah -->
                      </div>
                  </div>
             </section>
