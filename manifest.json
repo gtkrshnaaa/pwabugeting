@@ -1,7 +1,7 @@
 {
-  "name": "Dompet Damai: Anggaran Pribadi",
-  "short_name": "Dompet Damai",
-  "description": "Aplikasi pelacak pengeluaran yang simpel, manis, dan bekerja offline.",
+  "name": "Budgeting PWA",
+  "short_name": "Budgeting",
+  "description": "Aplikasi pelacak pengeluaran yang simpel, dan bekerja offline.",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#f5f3ff",
