@@ -4,8 +4,8 @@
   "description": "Aplikasi pelacak pengeluaran yang simpel, manis, dan bekerja offline.",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#ecfdf5",
-  "theme_color": "#10b981",
+  "background_color": "#f5f3ff",
+  "theme_color": "#8b5cf6",
   "orientation": "portrait-primary",
   "icons": [
     {

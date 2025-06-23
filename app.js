@@ -87,8 +87,8 @@ async function renderCategories() {
                 <span class="font-semibold text-gray-700">${cat.name}</span>
                 <span class="text-sm text-gray-500">${formatCurrency(spentOnCat)} / ${formatCurrency(cat.limit)}</span>
             </div>
-            <div class="w-full bg-emerald-100 rounded-full h-2.5">
-                <div class="bg-gradient-to-r from-green-300 to-emerald-500 h-2.5 rounded-full" style="width: ${Math.min(100, progress)}%"></div>
+            <div class="w-full bg-violet-100 rounded-full h-2.5">
+                <div class="bg-gradient-to-r from-purple-300 to-violet-500 h-2.5 rounded-full" style="width: ${Math.min(100, progress)}%"></div>
             </div>
         `;
         categoryListEl.appendChild(item);
@@ -163,8 +163,8 @@ function createCategoryInput() {
     const fieldWrapper = document.createElement('div');
     fieldWrapper.className = 'flex gap-2 items-center';
     fieldWrapper.innerHTML = `
-        <input type="text" name="category_name" class="w-2/3 p-2 border border-emerald-200 rounded-lg" placeholder="Nama Kategori" required>
-        <input type="number" name="category_limit" class="w-1/3 p-2 border border-emerald-200 rounded-lg" placeholder="Limit" required>
+        <input type="text" name="category_name" class="w-2/3 p-2 border border-violet-200 rounded-lg" placeholder="Nama Kategori" required>
+        <input type="number" name="category_limit" class="w-1/3 p-2 border border-violet-200 rounded-lg" placeholder="Limit" required>
         <button type="button" class="text-red-500 remove-cat-btn">&times;</button>
     `;
     container.appendChild(fieldWrapper);
@@ -276,7 +276,8 @@ function initPwaInstall() {
         installContainer.innerHTML = ''; // Hapus tombol lama jika ada
         const installButton = document.createElement('button');
         installButton.textContent = 'Pasang Aplikasi Dompet Damai';
-        installButton.className = 'px-4 py-2 bg-emerald-500 text-white font-semibold rounded-lg shadow-md hover:bg-emerald-600 transition';
+        // Mengubah kelas tombol instalasi menjadi tema ungu
+        installButton.className = 'px-4 py-2 bg-violet-500 text-white font-semibold rounded-lg shadow-md hover:bg-violet-600 transition';
         installContainer.appendChild(installButton);
 
         installButton.addEventListener('click', () => {

@@ -7,12 +7,12 @@
     
     <!-- PWA Manifest & Theme -->
     <link rel="manifest" href="./manifest.json">
-    <meta name="theme-color" content="#10b981">
+    <meta name="theme-color" content="#8b5cf6"> <!-- Violet 500 -->
     
     <!-- Tailwind CSS Play CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Google Fonts: Poppins untuk kesan yang lebih lembut -->
+    <!-- Google Fonts: Poppins -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -20,11 +20,11 @@
     <!-- Custom Style untuk tema -->
     <style>
         body { font-family: 'Poppins', sans-serif; }
-        /* Custom scrollbar untuk tampilan yang lebih manis */
+        /* Custom scrollbar dengan tema ungu */
         ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: #f0fdf4; }
-        ::-webkit-scrollbar-thumb { background: #34d399; border-radius: 10px; }
-        ::-webkit-scrollbar-thumb:hover { background: #10b981; }
+        ::-webkit-scrollbar-track { background: #f5f3ff; } /* violet-50 */
+        ::-webkit-scrollbar-thumb { background: #a78bfa; border-radius: 10px; } /* violet-400 */
+        ::-webkit-scrollbar-thumb:hover { background: #8b5cf6; } /* violet-500 */
     </style>
     
     <!-- Scripts -->
@@ -32,26 +32,26 @@
     <script src="./db.js" defer></script>
     <script src="./app.js" defer></script>
 </head>
-<body class="bg-emerald-50 text-gray-800">
+<body class="bg-violet-50 text-gray-800">
 
     <!-- Kontainer Utama -->
     <div id="app-container" class="max-w-md mx-auto p-4 min-h-screen">
         
         <!-- Header -->
         <header class="text-center my-6">
-            <h1 class="text-3xl font-bold text-emerald-700">Dompet Damai</h1>
-            <p class="text-emerald-600">Catat pengeluaran, tenangkan pikiran.</p>
+            <h1 class="text-3xl font-bold text-violet-700">Dompet Damai</h1>
+            <p class="text-violet-600">Catat pengeluaran, tenangkan pikiran.</p>
         </header>
 
         <!-- Main Content -->
         <main id="main-content" class="space-y-6">
             <!-- Ringkasan Anggaran -->
             <section id="summary-card" class="bg-white p-5 rounded-2xl shadow-md space-y-4">
-                 <h2 class="text-lg font-semibold text-emerald-800 border-b pb-2">Ringkasan Bulan Ini</h2>
+                 <h2 class="text-lg font-semibold text-violet-800 border-b pb-2">Ringkasan Bulan Ini</h2>
                  <div class="grid grid-cols-3 gap-4 text-center">
                      <div>
                          <p class="text-sm text-gray-500">Anggaran</p>
-                         <p id="summary-limit" class="font-bold text-lg text-emerald-600">Rp 0</p>
+                         <p id="summary-limit" class="font-bold text-lg text-violet-600">Rp 0</p>
                      </div>
                      <div>
                          <p class="text-sm text-gray-500">Terpakai</p>
@@ -67,8 +67,8 @@
             <!-- Daftar Kategori -->
             <section id="category-section" class="bg-white p-5 rounded-2xl shadow-md">
                 <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-lg font-semibold text-emerald-800">Alokasi Dana</h2>
-                    <button id="setup-button" class="text-emerald-600 font-semibold text-sm">+ Atur</button>
+                    <h2 class="text-lg font-semibold text-violet-800">Alokasi Dana</h2>
+                    <button id="setup-button" class="text-violet-600 font-semibold text-sm">+ Atur</button>
                 </div>
                 <div id="category-list" class="space-y-4">
                     <!-- Kategori akan di-render di sini oleh JavaScript -->
@@ -77,7 +77,7 @@
             
              <!-- Riwayat Pengeluaran -->
             <section id="history-section" class="bg-white p-5 rounded-2xl shadow-md">
-                 <h2 class="text-lg font-semibold text-emerald-800 mb-4">Riwayat Pengeluaran</h2>
+                 <h2 class="text-lg font-semibold text-violet-800 mb-4">Riwayat Pengeluaran</h2>
                  <div id="expense-history" class="space-y-3 max-h-60 overflow-y-auto">
                     <!-- Riwayat akan di-render di sini -->
                  </div>
@@ -87,7 +87,7 @@
 
         <!-- Tombol Aksi Utama (Floating Action Button) -->
         <div class="fixed bottom-6 right-6">
-            <button id="add-expense-button" class="bg-emerald-500 text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-3xl font-light hover:bg-emerald-600 transition-transform transform hover:scale-110">
+            <button id="add-expense-button" class="bg-violet-500 text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-3xl font-light hover:bg-violet-600 transition-transform transform hover:scale-110">
                 +
             </button>
         </div>
@@ -101,24 +101,24 @@
     
     <!-- Modal untuk Setup Anggaran dan Kategori -->
     <div id="setup-modal" class="fixed inset-0 flex items-center justify-center p-4 hidden z-50">
-        <div class="bg-emerald-50 w-full max-w-sm p-6 rounded-2xl shadow-xl space-y-4 transform transition-all scale-95 opacity-0">
-             <h3 class="text-xl font-semibold text-emerald-800">Atur Anggaran</h3>
+        <div class="bg-violet-50 w-full max-w-sm p-6 rounded-2xl shadow-xl space-y-4 transform transition-all scale-95 opacity-0">
+             <h3 class="text-xl font-semibold text-violet-800">Atur Anggaran</h3>
              <form id="setup-form" class="space-y-4">
                  <div>
                      <label for="total-budget" class="text-sm font-medium text-gray-600">Total Anggaran Bulanan</label>
-                     <input type="number" id="total-budget" class="mt-1 w-full p-2 border border-emerald-200 rounded-lg focus:ring-emerald-500 focus:border-emerald-500" placeholder="5000000">
+                     <input type="number" id="total-budget" class="mt-1 w-full p-2 border border-violet-200 rounded-lg focus:ring-violet-500 focus:border-violet-500" placeholder="5000000">
                  </div>
                  <hr>
                  <div class="flex justify-between items-center">
-                    <h4 class="text-lg font-semibold text-emerald-700">Kategori</h4>
-                    <button type="button" id="add-category-field-button" class="text-sm bg-emerald-200 text-emerald-800 px-3 py-1 rounded-full">+ Tambah</button>
+                    <h4 class="text-lg font-semibold text-violet-700">Kategori</h4>
+                    <button type="button" id="add-category-field-button" class="text-sm bg-violet-200 text-violet-800 px-3 py-1 rounded-full">+ Tambah</button>
                  </div>
                  <div id="category-fields" class="space-y-2 max-h-40 overflow-y-auto">
                     <!-- Field untuk kategori baru akan ditambahkan di sini -->
                  </div>
                  <div class="flex gap-4 pt-4">
                     <button type="button" id="close-setup-modal" class="w-full py-2 bg-gray-200 text-gray-700 rounded-lg">Batal</button>
-                    <button type="submit" class="w-full py-2 bg-emerald-500 text-white rounded-lg">Simpan</button>
+                    <button type="submit" class="w-full py-2 bg-violet-500 text-white rounded-lg">Simpan</button>
                  </div>
              </form>
         </div>
@@ -126,26 +126,26 @@
     
     <!-- Modal untuk Tambah Pengeluaran -->
     <div id="expense-modal" class="fixed inset-0 flex items-center justify-center p-4 hidden z-50">
-        <div class="bg-emerald-50 w-full max-w-sm p-6 rounded-2xl shadow-xl space-y-4 transform transition-all scale-95 opacity-0">
-            <h3 class="text-xl font-semibold text-emerald-800">Catat Pengeluaran</h3>
+        <div class="bg-violet-50 w-full max-w-sm p-6 rounded-2xl shadow-xl space-y-4 transform transition-all scale-95 opacity-0">
+            <h3 class="text-xl font-semibold text-violet-800">Catat Pengeluaran</h3>
             <form id="expense-form" class="space-y-4">
                  <div>
                      <label for="expense-amount" class="text-sm font-medium text-gray-600">Jumlah</label>
-                     <input type="number" id="expense-amount" class="mt-1 w-full p-2 border border-emerald-200 rounded-lg" required>
+                     <input type="number" id="expense-amount" class="mt-1 w-full p-2 border border-violet-200 rounded-lg" required>
                  </div>
                  <div>
                      <label for="expense-category" class="text-sm font-medium text-gray-600">Pilih Kategori</label>
-                     <select id="expense-category" class="mt-1 w-full p-2 border border-emerald-200 rounded-lg bg-white" required>
+                     <select id="expense-category" class="mt-1 w-full p-2 border border-violet-200 rounded-lg bg-white" required>
                          <!-- Opsi kategori akan diisi oleh JavaScript -->
                      </select>
                  </div>
                  <div>
                      <label for="expense-desc" class="text-sm font-medium text-gray-600">Deskripsi (Opsional)</label>
-                     <input type="text" id="expense-desc" class="mt-1 w-full p-2 border border-emerald-200 rounded-lg" placeholder="Makan siang">
+                     <input type="text" id="expense-desc" class="mt-1 w-full p-2 border border-violet-200 rounded-lg" placeholder="Makan siang">
                  </div>
                  <div class="flex gap-4 pt-4">
                     <button type="button" id="close-expense-modal" class="w-full py-2 bg-gray-200 text-gray-700 rounded-lg">Batal</button>
-                    <button type="submit" class="w-full py-2 bg-emerald-500 text-white rounded-lg">Catat</button>
+                    <button type="submit" class="w-full py-2 bg-violet-500 text-white rounded-lg">Catat</button>
                  </div>
             </form>
         </div>
