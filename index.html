@@ -20,11 +20,10 @@
     <!-- Custom Style untuk tema -->
     <style>
         body { font-family: 'Poppins', sans-serif; }
-        /* Custom scrollbar dengan tema ungu */
         ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: #f5f3ff; } /* violet-50 */
-        ::-webkit-scrollbar-thumb { background: #a78bfa; border-radius: 10px; } /* violet-400 */
-        ::-webkit-scrollbar-thumb:hover { background: #8b5cf6; } /* violet-500 */
+        ::-webkit-scrollbar-track { background: #f5f3ff; }
+        ::-webkit-scrollbar-thumb { background: #a78bfa; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #8b5cf6; }
     </style>
     
     <!-- Scripts -->
@@ -45,24 +44,21 @@
 
         <!-- Main Content -->
         <main id="main-content" class="space-y-6">
-            
-            <!-- Ringkasan Anggaran (Bagian yang Diperbarui) -->
+             <!-- Ringkasan Anggaran (Responsif) -->
             <section id="summary-card" class="bg-white p-5 rounded-2xl shadow-md space-y-4">
                  <h2 class="text-lg font-semibold text-violet-800 border-b pb-2 mb-4">Ringkasan Bulan Ini</h2>
-                 <!-- Div ini sekarang menjadi flexbox vertikal di layar kecil dan grid di layar besar -->
                  <div class="flex flex-col space-y-4 sm:space-y-0 sm:grid sm:grid-cols-3 sm:gap-4">
-                     <!-- Setiap item dibuat menjadi flexbox untuk alignment yang lebih baik -->
                      <div class="flex sm:flex-col justify-between items-center sm:items-start sm:text-center p-2 rounded-lg">
                          <p class="text-sm text-gray-500">Anggaran</p>
                          <p id="summary-limit" class="font-bold text-lg text-violet-600">Rp 0</p>
                      </div>
                      <div class="flex sm:flex-col justify-between items-center sm:items-start sm:text-center p-2 rounded-lg">
                          <p class="text-sm text-gray-500">Terpakai</p>
-                         <p id="summary-spent" class="font-bold text-lg text-violet-600">Rp 0</p> <!-- Warna diubah -->
+                         <p id="summary-spent" class="font-bold text-lg text-violet-600">Rp 0</p>
                      </div>
                      <div class="flex sm:flex-col justify-between items-center sm:items-start sm:text-center p-2 rounded-lg">
                          <p class="text-sm text-gray-500">Sisa</p>
-                         <p id="summary-remaining" class="font-bold text-lg text-violet-600">Rp 0</p> <!-- Warna diubah -->
+                         <p id="summary-remaining" class="font-bold text-lg text-violet-600">Rp 0</p>
                      </div>
                  </div>
             </section>
@@ -73,36 +69,29 @@
                     <h2 class="text-lg font-semibold text-violet-800">Alokasi Dana</h2>
                     <button id="setup-button" class="text-violet-600 font-semibold text-sm">+ Atur</button>
                 </div>
-                <div id="category-list" class="space-y-4">
-                    <!-- Kategori akan di-render di sini oleh JavaScript -->
-                </div>
+                <div id="category-list" class="space-y-4"></div>
             </section>
             
              <!-- Riwayat Pengeluaran -->
             <section id="history-section" class="bg-white p-5 rounded-2xl shadow-md">
                  <h2 class="text-lg font-semibold text-violet-800 mb-4">Riwayat Pengeluaran</h2>
-                 <div id="expense-history" class="space-y-3 max-h-60 overflow-y-auto">
-                    <!-- Riwayat akan di-render di sini -->
-                 </div>
+                 <div id="expense-history" class="space-y-3 max-h-60 overflow-y-auto"></div>
             </section>
-
         </main>
 
-        <!-- Tombol Aksi Utama (Floating Action Button) -->
+        <!-- Floating Action Button -->
         <div class="fixed bottom-6 right-6">
-            <button id="add-expense-button" class="bg-violet-500 text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-3xl font-light hover:bg-violet-600 transition-transform transform hover:scale-110">
-                +
-            </button>
+            <button id="add-expense-button" class="bg-violet-500 text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-3xl font-light hover:bg-violet-600 transition-transform transform hover:scale-110">+</button>
         </div>
-         <!-- PWA Install Button Container -->
+        
         <footer id="install-container" class="text-center p-4"></footer>
     </div>
 
-    <!-- MODALS -->
+    <!-- ========= MODALS ========= -->
     <!-- Modal Overlay -->
     <div id="modal-overlay" class="fixed inset-0 bg-black bg-opacity-40 hidden z-40"></div>
     
-    <!-- Modal untuk Setup Anggaran dan Kategori -->
+    <!-- Modal Setup Anggaran -->
     <div id="setup-modal" class="fixed inset-0 flex items-center justify-center p-4 hidden z-50">
         <div class="bg-violet-50 w-full max-w-sm p-6 rounded-2xl shadow-xl space-y-4 transform transition-all scale-95 opacity-0">
              <h3 class="text-xl font-semibold text-violet-800">Atur Anggaran</h3>
@@ -116,18 +105,20 @@
                     <h4 class="text-lg font-semibold text-violet-700">Kategori</h4>
                     <button type="button" id="add-category-field-button" class="text-sm bg-violet-200 text-violet-800 px-3 py-1 rounded-full">+ Tambah</button>
                  </div>
-                 <div id="category-fields" class="space-y-2 max-h-40 overflow-y-auto">
-                    <!-- Field untuk kategori baru akan ditambahkan di sini -->
-                 </div>
-                 <div class="flex gap-4 pt-4">
+                 <div id="category-fields" class="space-y-2 max-h-40 overflow-y-auto"></div>
+                 <div class="flex gap-4 pt-4 border-t mt-4">
                     <button type="button" id="close-setup-modal" class="w-full py-2 bg-gray-200 text-gray-700 rounded-lg">Batal</button>
                     <button type="submit" class="w-full py-2 bg-violet-500 text-white rounded-lg">Simpan</button>
                  </div>
              </form>
+             <!-- Tombol Reset Data (Baru) -->
+             <div class="text-center pt-4">
+                <button id="reset-data-button" class="text-sm text-red-600 hover:text-red-800">Reset Semua Data Aplikasi</button>
+             </div>
         </div>
     </div>
     
-    <!-- Modal untuk Tambah Pengeluaran -->
+    <!-- Modal Tambah Pengeluaran -->
     <div id="expense-modal" class="fixed inset-0 flex items-center justify-center p-4 hidden z-50">
         <div class="bg-violet-50 w-full max-w-sm p-6 rounded-2xl shadow-xl space-y-4 transform transition-all scale-95 opacity-0">
             <h3 class="text-xl font-semibold text-violet-800">Catat Pengeluaran</h3>
@@ -138,9 +129,7 @@
                  </div>
                  <div>
                      <label for="expense-category" class="text-sm font-medium text-gray-600">Pilih Kategori</label>
-                     <select id="expense-category" class="mt-1 w-full p-2 border border-violet-200 rounded-lg bg-white" required>
-                         <!-- Opsi kategori akan diisi oleh JavaScript -->
-                     </select>
+                     <select id="expense-category" class="mt-1 w-full p-2 border border-violet-200 rounded-lg bg-white" required></select>
                  </div>
                  <div>
                      <label for="expense-desc" class="text-sm font-medium text-gray-600">Deskripsi (Opsional)</label>
@@ -151,6 +140,18 @@
                     <button type="submit" class="w-full py-2 bg-violet-500 text-white rounded-lg">Catat</button>
                  </div>
             </form>
+        </div>
+    </div>
+    
+    <!-- Modal Konfirmasi Reset (Baru) -->
+    <div id="confirm-reset-modal" class="fixed inset-0 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-white w-full max-w-sm p-6 rounded-2xl shadow-xl space-y-4 text-center transform transition-all scale-95 opacity-0">
+            <h3 class="text-xl font-semibold text-red-600">Anda Yakin?</h3>
+            <p class="text-gray-600">Semua data anggaran, kategori, dan riwayat pengeluaran akan dihapus permanen. Tindakan ini tidak dapat dibatalkan.</p>
+            <div class="flex gap-4 pt-4">
+                <button type="button" id="cancel-reset-btn" class="w-full py-2 bg-gray-200 text-gray-700 rounded-lg">Batal</button>
+                <button type="button" id="confirm-reset-btn" class="w-full py-2 bg-red-500 text-white rounded-lg">Ya, Hapus Semua</button>
+            </div>
         </div>
     </div>
 
