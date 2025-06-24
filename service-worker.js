@@ -47,16 +47,35 @@ self.addEventListener('activate', event => {
 
 // Event: Fetch
 // Menentukan bagaimana aplikasi merespon permintaan jaringan.
-// Strategi: Network First, Fallback to Cache.
+// Strategi: Cache First, Fallback to Network.
 self.addEventListener('fetch', event => {
     // Abaikan request selain GET
     if (event.request.method !== 'GET') return;
-    
+
     event.respondWith(
-        // Coba ambil dari jaringan terlebih dahulu
-        fetch(event.request).catch(() => {
-            // Jika gagal (misalnya, offline), cari di dalam cache.
-            return caches.match(event.request);
-        })
+        caches.match(event.request) // Coba ambil dari cache dulu
+            .then(response => {
+                // Jika ada di cache, langsung kembalikan
+                if (response) {
+                    return response;
+                }
+                // Jika tidak ada di cache, coba dari jaringan
+                return fetch(event.request)
+                    .then(networkResponse => {
+                        // Dan simpan ke cache untuk penggunaan selanjutnya
+                        return caches.open(CACHE_NAME).then(cache => {
+                            // Penting: Jangan cache request POST atau opaque responses
+                            if (networkResponse.ok || networkResponse.type === 'opaque') {
+                                cache.put(event.request, networkResponse.clone());
+                            }
+                            return networkResponse;
+                        });
+                    })
+                    .catch(error => {
+                        console.log('Fetch failed, and no cache entry found:', error);
+                        // Master bisa menampilkan halaman offline khusus di sini
+                        // return caches.match('/offline.html'); // Jika Master punya halaman offline.html
+                    });
+            })
     );
 });

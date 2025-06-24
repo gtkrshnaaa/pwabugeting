@@ -1,4 +1,5 @@
 ===== ./app.js =====
+// ===== ./app.js =====
 // app.js - Logika Utama Aplikasi Budgeting
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -13,12 +14,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // Form
     const setupForm = document.getElementById('setup-form');
     const expenseForm = document.getElementById('expense-form');
-    
+
     // Tombol Modal
     const closeSetupModalBtn = document.getElementById('close-setup-modal');
     const closeExpenseModalBtn = document.getElementById('close-expense-modal');
     const addCategoryFieldBtn = document.getElementById('add-category-field-button');
-    
+
     // Tombol Aksi
     const resetDataBtn = document.getElementById('reset-data-button');
     const cancelResetBtn = document.getElementById('cancel-reset-btn');
@@ -27,31 +28,28 @@ document.addEventListener('DOMContentLoaded', () => {
     const exportCsvBtn = document.getElementById('export-csv-btn');
 
     // --- Event Listeners ---
-    setupButton.addEventListener('click', openSetupModal); // Menggunakan fungsi baru
+    setupButton.addEventListener('click', openSetupModal);
     addExpenseButton.addEventListener('click', () => showModal(expenseModal));
     
+    // Event Listener Terpusat untuk Menutup Modal
     [closeSetupModalBtn, closeExpenseModalBtn, modalOverlay, cancelResetBtn].forEach(el => {
-        el.addEventListener('click', () => {
-            hideModal(setupModal);
-            hideModal(expenseModal);
-            hideModal(confirmResetModal);
-        });
+        el.addEventListener('click', closeAllModals);
     });
 
     addCategoryFieldBtn.addEventListener('click', () => createCategoryInput());
     setupForm.addEventListener('submit', handleSetupForm);
     expenseForm.addEventListener('submit', handleExpenseForm);
-    
+
     resetDataBtn.addEventListener('click', () => {
-        hideModal(setupModal);
-        showModal(confirmResetModal);
+        hideModal(setupModal); // Sembunyikan modal setup
+        showModal(confirmResetModal); // Tampilkan modal konfirmasi
     });
     confirmResetBtn.addEventListener('click', handleDataReset);
 
     // Event listener untuk tombol ekspor
     exportJsonBtn.addEventListener('click', exportToJSON);
     exportCsvBtn.addEventListener('click', exportToCSV);
-    
+
     // --- Inisialisasi ---
     registerServiceWorker();
     initPwaInstall();
@@ -72,9 +70,8 @@ async function renderSummary() {
     const allExpenses = await getExpenses();
     const spent = allExpenses.reduce((sum, exp) => sum + exp.amount, 0);
     const remaining = limit - spent;
-    
+
     document.getElementById('summary-limit').textContent = formatCurrency(limit);
-    // Memberi warna merah pada pengeluaran agar lebih menonjol
     document.getElementById('summary-spent').textContent = formatCurrency(spent);
     document.getElementById('summary-remaining').textContent = formatCurrency(remaining);
 }
@@ -128,6 +125,24 @@ async function renderExpenseHistory() {
 }
 
 // --- Fungsi Modal & Form ---
+
+// Fungsi baru untuk menutup semua modal dan overlay
+function closeAllModals() {
+    const overlay = document.getElementById('modal-overlay');
+    // Cek dulu apakah ada modal yang terbuka untuk ditutup
+    if (!overlay.classList.contains('hidden')) {
+        const setupModal = document.getElementById('setup-modal');
+        const expenseModal = document.getElementById('expense-modal');
+        const confirmResetModal = document.getElementById('confirm-reset-modal');
+        
+        hideModal(setupModal);
+        hideModal(expenseModal);
+        hideModal(confirmResetModal);
+        // Sembunyikan overlay setelah animasi modal selesai
+        setTimeout(() => overlay.classList.add('hidden'), 200);
+    }
+}
+
 function showModal(modalEl) {
     const modalContent = modalEl.querySelector('div');
     document.getElementById('modal-overlay').classList.remove('hidden');
@@ -139,24 +154,22 @@ function showModal(modalEl) {
 }
 
 function hideModal(modalEl) {
+    // Jangan lakukan apa-apa jika modal sudah hidden
+    if (!modalEl || modalEl.classList.contains('hidden')) return;
+
     const modalContent = modalEl.querySelector('div');
     modalContent.classList.remove('scale-100', 'opacity-100');
     modalContent.classList.add('scale-95', 'opacity-0');
     setTimeout(() => {
-         modalEl.classList.add('hidden');
-         if (modalEl.id === 'confirm-reset-modal') {
-             document.getElementById('modal-overlay').classList.add('hidden');
-         }
+        modalEl.classList.add('hidden');
+        // Logika overlay dipindahkan ke closeAllModals agar lebih terpusat
     }, 200);
 }
 
-/**
- * Fungsi baru untuk membuka modal setup & mengisi form dengan data yang ada
- */
 async function openSetupModal() {
     const totalBudgetInput = document.getElementById('total-budget');
     const categoryFieldsContainer = document.getElementById('category-fields');
-    
+
     // Ambil data saat ini dari DB
     const currentBudget = await getConfig('totalBudget');
     const currentCategories = await getCategories();
@@ -165,16 +178,20 @@ async function openSetupModal() {
     totalBudgetInput.value = currentBudget || '';
     categoryFieldsContainer.innerHTML = ''; // Kosongkan field kategori lama
     currentCategories.forEach(cat => {
-        createCategoryInput(cat.name, cat.limit); // Panggil dengan data
+        createCategoryInput(cat.id, cat.name, cat.limit); // Panggil dengan data lengkap
     });
 
     showModal(document.getElementById('setup-modal'));
 }
 
-function createCategoryInput(name = '', limit = '') {
+function createCategoryInput(id = null, name = '', limit = '') {
     const container = document.getElementById('category-fields');
     const fieldWrapper = document.createElement('div');
-    fieldWrapper.className = 'flex gap-2 items-center';
+    fieldWrapper.className = 'flex gap-2 items-center category-entry'; // tambah class
+    // Tambahkan data-id jika ada
+    if (id) {
+        fieldWrapper.dataset.id = id;
+    }
     fieldWrapper.innerHTML = `
         <input type="text" name="category_name" class="w-2/3 p-2 border border-violet-200 rounded-lg" placeholder="Nama Kategori" value="${name}" required>
         <input type="number" name="category_limit" class="w-1/3 p-2 border border-violet-200 rounded-lg" placeholder="Limit" value="${limit}" required>
@@ -186,30 +203,60 @@ function createCategoryInput(name = '', limit = '') {
 async function handleSetupForm(e) {
     e.preventDefault();
     const totalBudget = parseFloat(document.getElementById('total-budget').value);
-    if (isNaN(totalBudget) || totalBudget < 0) { // Izinkan 0 untuk reset budget
+    if (isNaN(totalBudget) || totalBudget < 0) {
         alert('Total anggaran harus diisi dengan angka yang valid.');
         return;
     }
-    const categoryNames = document.querySelectorAll('input[name="category_name"]');
-    const categoryLimits = document.querySelectorAll('input[name="category_limit"]');
+
+    const categoryEntries = document.querySelectorAll('.category-entry');
     let totalLimit = 0;
-    const categories = [];
-    for (let i = 0; i < categoryNames.length; i++) {
-        const name = categoryNames[i].value.trim();
-        const limit = parseFloat(categoryLimits[i].value);
-        if (name && !isNaN(limit) && limit > 0) {
+    const formCategoryIds = [];
+
+    // Validasi total limit dulu
+    for (const entry of categoryEntries) {
+        const limit = parseFloat(entry.querySelector('input[name="category_limit"]').value);
+        if (!isNaN(limit) && limit > 0) {
             totalLimit += limit;
-            categories.push({ name, limit });
         }
     }
+
     if (totalLimit > totalBudget) {
         alert('Total limit kategori tidak boleh melebihi total anggaran bulanan!');
         return;
     }
+
+    // Simpan budget utama
     await setConfig('totalBudget', totalBudget);
-    await clearCategories();
-    for (const cat of categories) { await addCategory(cat); }
-    hideModal(document.getElementById('setup-modal'));
+
+    // Ambil ID kategori yang ada di DB sebelum diubah
+    const originalCategories = await getCategories();
+    const originalCategoryIds = originalCategories.map(cat => cat.id);
+
+    // Proses setiap entri di form
+    for (const entry of categoryEntries) {
+        const id = entry.dataset.id ? parseInt(entry.dataset.id, 10) : null;
+        const name = entry.querySelector('input[name="category_name"]').value.trim();
+        const limit = parseFloat(entry.querySelector('input[name="category_limit"]').value);
+
+        if (name && !isNaN(limit) && limit > 0) {
+            if (id) {
+                // Ini kategori lama (UPDATE)
+                await updateCategory({ id, name, limit });
+                formCategoryIds.push(id);
+            } else {
+                // Ini kategori baru (ADD)
+                await addCategory({ name, limit });
+            }
+        }
+    }
+
+    // Cari kategori yang dihapus (ada di DB tapi tidak ada di form)
+    const deletedIds = originalCategoryIds.filter(id => !formCategoryIds.includes(id));
+    for (const id of deletedIds) {
+        await deleteCategory(id);
+    }
+
+    closeAllModals(); // Gunakan fungsi baru kita
     await renderUI();
 }
 
@@ -224,13 +271,13 @@ async function handleExpenseForm(e) {
     }
     await addExpense({ amount, categoryId, description, date: new Date().toISOString() });
     document.getElementById('expense-form').reset();
-    hideModal(document.getElementById('expense-modal'));
+    closeAllModals();
     await renderUI();
 }
 
 async function handleDataReset() {
     await resetDatabase();
-    hideModal(document.getElementById('confirm-reset-modal'));
+    closeAllModals();
     await renderUI(); // Re-render UI yang sekarang akan kosong
 }
 
@@ -256,9 +303,6 @@ async function populateCategoryDropdown() {
         selectEl.appendChild(option);
     });
 }
-
-function registerServiceWorker() { /* ... kode sama ... */ }
-function initPwaInstall() { /* ... kode sama ... */ }
 
 // Kode PWA (tidak berubah dari versi sebelumnya)
 function registerServiceWorker() {
@@ -288,8 +332,8 @@ function initPwaInstall() {
         });
     });
 }
-
 ===== ./db.js =====
+// ===== ./db.js =====
 // db.js - Skema Database Baru untuk Pelacakan Pengeluaran
 
 const DB_NAME = 'DompetDamaiDB-v2';
@@ -335,6 +379,9 @@ async function getConfig(key) {
 async function clearCategories() { return (await initDB()).clear(STORES.CATEGORIES); }
 async function addCategory(category) { return (await initDB()).add(STORES.CATEGORIES, category); }
 async function getCategories() { return (await initDB()).getAll(STORES.CATEGORIES); }
+async function updateCategory(category) { return (await initDB()).put(STORES.CATEGORIES, category); }
+async function deleteCategory(id) { return (await initDB()).delete(STORES.CATEGORIES, id); }
+
 
 // --- Fungsi Expenses ---
 async function addExpense(expense) { return (await initDB()).add(STORES.EXPENSES, expense); }
@@ -354,7 +401,6 @@ async function resetDatabase() {
         db.clear(STORES.EXPENSES)
     ]);
 }
-
 ===== ./.gitignore =====
 
 ===== ./icons/icon-128x128.png =====
