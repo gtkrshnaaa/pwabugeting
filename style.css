@@ -5,6 +5,7 @@
     --violet-50: #f5f3ff;
     --violet-100: #ede9fe;
     --violet-200: #ddd6fe;
+    --violet-300: #c4b5fd; /* Ditambahkan untuk hover btn-add-category */
     --violet-500: #8b5cf6;
     --violet-600: #7c3aed;
     --violet-700: #6d28d9;
@@ -18,6 +19,7 @@
     --green-600: #22c55e;
 
     --gray-200: #e5e7eb;
+    --gray-300: #d1d5db; /* Ditambahkan untuk hover btn-cancel */
     --gray-500: #6b7280;
     --gray-600: #4b5563;
     --gray-700: #374151;
@@ -33,6 +35,8 @@ body {
     margin: 0;
     padding: 0;
     line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
 ::-webkit-scrollbar {
@@ -107,8 +111,14 @@ h2 {
     margin-bottom: 1rem;
 }
 
-.section-header h2 {
-    margin-bottom: 0; /* Override default h2 margin */
+.section-header h2, .section-header h4 {
+    margin-bottom: 0; /* Override default h2/h4 margin */
+}
+
+.section-header h4 { /* Styling untuk "Kategori" di modal setup */
+    font-size: 1.125rem; /* text-lg */
+    font-weight: 600; /* font-semibold */
+    color: var(--violet-700);
 }
 
 /* --- Summary Card --- */
@@ -177,36 +187,35 @@ h2 {
     font-size: 0.875rem;
 }
 
-#category-list > div {
-    /* Styles for each category item */
+.category-item-wrapper {
     margin-bottom: 0.5rem; /* mimic gap in original structure */
 }
 
-#category-list > div > div:first-child {
+.category-item-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 0.25rem; /* mb-1 */
 }
 
-#category-list > div > div:first-child span:first-child {
+.category-name {
     font-weight: 600; /* font-semibold */
     color: var(--gray-700);
 }
 
-#category-list > div > div:first-child span:last-child {
+.category-amount {
     font-size: 0.875rem; /* text-sm */
     color: var(--gray-500);
 }
 
-#category-list > div > div:last-child { /* progress bar container */
+.progress-bar-container { /* progress bar container */
     width: 100%;
     background-color: var(--violet-100);
     border-radius: 9999px; /* rounded-full */
     height: 0.625rem; /* h-2.5 */
 }
 
-#category-list > div > div:last-child div { /* progress bar */
+.progress-bar { /* progress bar */
     height: 0.625rem; /* h-2.5 */
     border-radius: 9999px; /* rounded-full */
     background-image: linear-gradient(to right, var(--purple-300), var(--violet-500)); /* bg-gradient-to-r from-purple-300 to-violet-500 */
@@ -227,23 +236,23 @@ h2 {
     font-size: 0.875rem;
 }
 
-#expense-history > div {
+.expense-item {
     display: flex;
     justify-content: space-between;
     align-items: center;
     font-size: 0.875rem; /* text-sm */
 }
 
-#expense-history > div > div p:first-child {
+.expense-description {
     font-weight: 600; /* font-semibold */
 }
 
-#expense-history > div > div p:last-child {
+.expense-category-name {
     font-size: 0.75rem; /* text-xs */
     color: var(--gray-500);
 }
 
-#expense-history > div span {
+.expense-amount-value {
     font-weight: 600; /* font-semibold */
     color: var(--red-500);
 }
@@ -297,7 +306,7 @@ h2 {
     padding: 1rem;
 }
 
-#install-container button {
+.btn-pwa-install { /* Kelas baru untuk tombol install PWA */
     padding: 0.5rem 1rem; /* px-4 py-2 */
     background-color: var(--violet-500);
     color: #fff;
@@ -309,7 +318,7 @@ h2 {
     transition: background-color 0.2s ease;
 }
 
-#install-container button:hover {
+.btn-pwa-install:hover {
     background-color: var(--violet-600);
 }
 
@@ -330,28 +339,23 @@ h2 {
     justify-content: center;
     padding: 1rem; /* p-4 */
     z-index: 50;
-    transition: all 0.2s ease-out; /* transform transition-all scale-95 opacity-0 */
+
+    /* Initial state (hidden by default) */
     opacity: 0;
     transform: scale(0.95);
-    pointer-events: none; /* Agar tidak memblokir klik saat hidden */
+    visibility: hidden; /* Tambahkan ini untuk benar-benar menyembunyikan */
+    transition: opacity 0.2s ease-out, transform 0.2s ease-out, visibility 0.2s ease-out;
 }
 
-.modal.hidden {
-    display: none; /* Sembunyikan sepenuhnya saat tidak aktif */
-}
-
-/* Transisi saat modal muncul */
-.modal-content.scale-100 {
+/* State saat modal aktif/terbuka */
+.modal.is-active {
     opacity: 1;
     transform: scale(1);
-    pointer-events: auto; /* Aktifkan kembali klik saat muncul */
+    visibility: visible;
 }
 
-/* Transisi saat modal sembunyi */
-.modal-content.scale-95 {
-    opacity: 0;
-    transform: scale(0.95);
-    pointer-events: none; /* Blokir klik saat menyembunyikan */
+.modal.hidden { /* Untuk initial load dan setelah transisi hide selesai */
+    display: none;
 }
 
 
@@ -365,7 +369,7 @@ h2 {
     display: flex;
     flex-direction: column;
     gap: 1rem; /* space-y-4 */
-    transition: all 0.2s ease-out; /* transform transition-all scale-95 opacity-0 */
+    /* Transisi sekarang ditangani di .modal */
 }
 
 .modal-content.center-content {
@@ -376,6 +380,7 @@ h2 {
     font-size: 1.25rem; /* text-xl */
     font-weight: 600; /* font-semibold */
     color: var(--violet-800);
+    margin-bottom: 0.5rem; /* Tambahkan sedikit margin bawah */
 }
 
 .modal-content h3.text-red-600 { /* Khusus untuk konfirmasi reset */
@@ -384,6 +389,7 @@ h2 {
 
 .modal-content p {
     color: var(--gray-600);
+    margin-bottom: 1rem; /* Tambahkan sedikit margin bawah */
 }
 
 .modal-content form {
@@ -404,8 +410,8 @@ h2 {
     margin-bottom: 0.25rem;
 }
 
-.modal-content input[type="number"],
-.modal-content input[type="text"],
+.input-field-full, /* Kelas baru untuk input field */
+.input-field-half, /* Kelas baru untuk input field setengah */
 .modal-content select {
     width: 100%;
     padding: 0.5rem; /* p-2 */
@@ -413,9 +419,11 @@ h2 {
     border-radius: 0.5rem; /* rounded-lg */
     outline: none; /* Remove default focus outline */
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    box-sizing: border-box; /* Pastikan padding tidak menambah lebar */
 }
 
-.modal-content input:focus,
+.input-field-full:focus,
+.input-field-half:focus,
 .modal-content select:focus {
     border-color: var(--violet-500); /* focus:border-violet-500 */
     box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2); /* focus:ring-violet-500 */
@@ -452,6 +460,7 @@ h2 {
     gap: 0.5rem; /* space-y-2 */
     max-height: 10rem; /* max-h-40 */
     overflow-y: auto;
+    padding-right: 0.5rem; /* Untuk mengakomodasi scrollbar */
 }
 
 .category-entry {
@@ -460,13 +469,14 @@ h2 {
     align-items: center;
 }
 
-.category-entry input[name="category_name"] {
-    width: 66.666667%; /* w-2/3 */
+.category-entry .input-field-half:first-child { /* input for category name */
+    width: 65%; /* sedikit diubah dari 2/3 untuk penyesuaian */
 }
 
-.category-entry input[name="category_limit"] {
-    width: 33.333333%; /* w-1/3 */
+.category-entry .input-field-half:last-of-type { /* input for category limit */
+    width: 35%; /* sedikit diubah dari 1/3 untuk penyesuaian */
 }
+
 
 .remove-cat-btn {
     color: var(--red-500);
@@ -476,6 +486,7 @@ h2 {
     font-size: 1.5rem;
     cursor: pointer;
     line-height: 1;
+    flex-shrink: 0; /* Pastikan tombol tidak menyusut */
 }
 .remove-cat-btn:hover {
     color: var(--red-600);
@@ -533,9 +544,18 @@ h2 {
     background: none;
     border: none;
     cursor: pointer;
+    margin-top: 1rem; /* pt-4 */
 }
 .btn-reset:hover {
     color: var(--red-800);
+}
+
+.btn-danger { /* Khusus untuk tombol konfirmasi hapus */
+    background-color: var(--red-500);
+    color: #fff;
+}
+.btn-danger:hover {
+    background-color: var(--red-600);
 }
 
 .btn-secondary {

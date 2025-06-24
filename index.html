@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Budgeting PWA</title>
+    
+    <link rel="manifest" href="./manifest.json">
+    <meta name="theme-color" content="#8b5cf6">
+    
+    <link rel="stylesheet" href="./style.css">
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <script src="https://cdn.jsdelivr.net/npm/idb@7/build/umd.js"></script>
+    <script src="./utils.js" defer></script>
+    <script src="./db.js" defer></script>
+    <script src="./app.js" defer></script>
+</head>
+<body>
+
+    <div id="app-container">
+        <header>
+            <h1>Budgeting PWA</h1>
+            <p>Catat pengeluaran, tenangkan pikiran.</p>
+        </header>
+
+        <main id="main-content">
+            <section id="summary-card">
+                <h2>Ringkasan Bulan Ini</h2>
+                <div class="summary-grid">
+                    <div class="summary-item">
+                        <p class="summary-label">Anggaran</p>
+                        <p id="summary-limit" class="summary-value violet">Rp 0</p>
+                    </div>
+                    <div class="summary-item">
+                        <p class="summary-label">Terpakai</p>
+                        <p id="summary-spent" class="summary-value red">Rp 0</p>
+                    </div>
+                    <div class="summary-item">
+                        <p class="summary-label">Sisa</p>
+                        <p id="summary-remaining" class="summary-value green">Rp 0</p>
+                    </div>
+                </div>
+            </section>
+            
+            <section id="category-section">
+                <div class="section-header">
+                    <h2>Alokasi Dana</h2>
+                    <button id="setup-button" class="btn-text">+ Atur</button>
+                </div>
+                <div id="category-list"></div>
+            </section>
+            
+            <section id="history-section">
+                <h2>Riwayat Pengeluaran</h2>
+                <div id="expense-history"></div>
+            </section>
+
+            <section id="export-section">
+                <h2>Opsi Data</h2>
+                <p>Simpan cadangan data Anda secara lokal.</p>
+                <div class="btn-group">
+                    <button id="export-json-btn" class="btn-secondary">Ekspor JSON</button>
+                    <button id="export-csv-btn" class="btn-secondary">Ekspor CSV</button>
+                </div>
+            </section>
+        </main>
+
+        <div class="fab-container">
+            <button id="add-expense-button" class="fab">+</button>
+        </div>
+        
+        <footer id="install-container"></footer>
+    </div>
+
+    <div id="modal-overlay" class="modal-overlay hidden"></div>
+    
+    <div id="setup-modal" class="modal hidden">
+        <div class="modal-content">
+            <h3>Atur Anggaran</h3>
+            <form id="setup-form">
+                <div>
+                    <label for="total-budget">Total Anggaran Bulanan</label>
+                    <input type="number" id="total-budget" class="input-field-full" placeholder="5000000">
+                </div>
+                <hr>
+                <div class="section-header">
+                    <h4>Kategori</h4>
+                    <button type="button" id="add-category-field-button" class="btn-add-category">+ Tambah</button>
+                </div>
+                <div id="category-fields"></div>
+                <div class="modal-buttons">
+                    <button type="button" id="close-setup-modal" class="btn-cancel">Batal</button>
+                    <button type="submit" class="btn-primary">Simpan</button>
+                </div>
+            </form>
+            <div class="text-center">
+                <button id="reset-data-button" class="btn-reset">Reset Semua Data Aplikasi</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="expense-modal" class="modal hidden">
+        <div class="modal-content">
+            <h3>Catat Pengeluaran</h3>
+            <form id="expense-form">
+                <div>
+                    <label for="expense-amount">Jumlah</label>
+                    <input type="number" id="expense-amount" class="input-field-full" required>
+                </div>
+                <div>
+                    <label for="expense-category">Pilih Kategori</label>
+                    <select id="expense-category" class="input-field-full" required></select>
+                </div>
+                <div>
+                    <label for="expense-desc">Deskripsi (Opsional)</label>
+                    <input type="text" id="expense-desc" class="input-field-full" placeholder="Makan siang">
+                </div>
+                <div class="modal-buttons">
+                    <button type="button" id="close-expense-modal" class="btn-cancel">Batal</button>
+                    <button type="submit" class="btn-primary">Catat</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <div id="confirm-reset-modal" class="modal hidden">
+        <div class="modal-content center-content">
+            <h3 class="text-red-600">Anda Yakin?</h3>
+            <p>Semua data anggaran, kategori, dan riwayat pengeluaran akan dihapus permanen. Tindakan ini tidak dapat dibatalkan.</p>
+            <div class="modal-buttons">
+                <button type="button" id="cancel-reset-btn" class="btn-cancel">Batal</button>
+                <button type="button" id="confirm-reset-btn" class="btn-danger">Ya, Hapus Semua</button>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>

@@ -89,13 +89,14 @@ async function renderCategories() {
         const spentOnCat = expensesForCat.reduce((sum, exp) => sum + exp.amount, 0);
         const progress = cat.limit > 0 ? (spentOnCat / cat.limit) * 100 : 0;
         const item = document.createElement('div');
+        item.className = 'category-item-wrapper';
         item.innerHTML = `
-            <div class="flex justify-between items-center mb-1">
-                <span class="font-semibold text-gray-700">${cat.name}</span>
-                <span class="text-sm text-gray-500">${formatCurrency(spentOnCat)} / ${formatCurrency(cat.limit)}</span>
+            <div class="category-item-header">
+                <span class="category-name">${cat.name}</span>
+                <span class="category-amount">${formatCurrency(spentOnCat)} / ${formatCurrency(cat.limit)}</span>
             </div>
-            <div class="w-full bg-violet-100 rounded-full h-2.5">
-                <div class="bg-gradient-to-r from-purple-300 to-violet-500 h-2.5 rounded-full" style="width: ${Math.min(100, progress)}%"></div>
+            <div class="progress-bar-container">
+                <div class="progress-bar" style="width: ${Math.min(100, progress)}%"></div>
             </div>`;
         categoryListEl.appendChild(item);
     }
@@ -113,72 +114,61 @@ async function renderExpenseHistory() {
     const categoryMap = new Map(categories.map(cat => [cat.id, cat.name]));
     expenses.slice(0, 15).forEach(exp => { // Tampilkan 15 terakhir
         const item = document.createElement('div');
-        item.className = "flex justify-between items-center text-sm";
+        item.className = "expense-item";
         item.innerHTML = `
             <div>
-                <p class="font-semibold">${exp.description || 'Pengeluaran'}</p>
-                <p class="text-xs text-gray-500">${categoryMap.get(exp.categoryId) || 'Lainnya'}</p>
+                <p class="expense-description">${exp.description || 'Pengeluaran'}</p>
+                <p class="expense-category-name">${categoryMap.get(exp.categoryId) || 'Lainnya'}</p>
             </div>
-            <span class="font-semibold text-red-500">${formatCurrency(exp.amount)}</span>`;
+            <span class="expense-amount-value">${formatCurrency(exp.amount)}</span>`;
         historyEl.appendChild(item);
     });
 }
 
 // --- Fungsi Modal & Form ---
 
-// Fungsi baru untuk menutup semua modal dan overlay
 function closeAllModals() {
     const overlay = document.getElementById('modal-overlay');
-    // Cek dulu apakah ada modal yang terbuka untuk ditutup
+    // Hanya sembunyikan overlay jika ada modal yang aktif
     if (!overlay.classList.contains('hidden')) {
-        const setupModal = document.getElementById('setup-modal');
-        const expenseModal = document.getElementById('expense-modal');
-        const confirmResetModal = document.getElementById('confirm-reset-modal');
-        
-        hideModal(setupModal);
-        hideModal(expenseModal);
-        hideModal(confirmResetModal);
-        // Sembunyikan overlay setelah animasi modal selesai
-        setTimeout(() => overlay.classList.add('hidden'), 200);
+        const activeModals = document.querySelectorAll('.modal:not(.hidden)');
+        activeModals.forEach(modal => hideModal(modal));
+        // Sembunyikan overlay setelah semua modal selesai transisi
+        setTimeout(() => overlay.classList.add('hidden'), 200); // Sesuaikan dengan durasi transisi CSS
     }
 }
 
 function showModal(modalEl) {
-    const modalContent = modalEl.querySelector('div');
     document.getElementById('modal-overlay').classList.remove('hidden');
     modalEl.classList.remove('hidden');
-    setTimeout(() => {
-        modalContent.classList.remove('scale-95', 'opacity-0');
-        modalContent.classList.add('scale-100', 'opacity-100');
+    // Tambahkan kelas 'is-active' untuk memulai transisi
+    setTimeout(() => { // Beri sedikit delay agar browser menerapkan 'display: block' sebelum transisi
+        modalEl.classList.add('is-active');
     }, 10);
 }
 
 function hideModal(modalEl) {
-    // Jangan lakukan apa-apa jika modal sudah hidden
     if (!modalEl || modalEl.classList.contains('hidden')) return;
 
-    const modalContent = modalEl.querySelector('div');
-    modalContent.classList.remove('scale-100', 'opacity-100');
-    modalContent.classList.add('scale-95', 'opacity-0');
-    setTimeout(() => {
+    // Hapus kelas 'is-active' untuk memulai transisi keluar
+    modalEl.classList.remove('is-active');
+    setTimeout(() => { // Sembunyikan setelah transisi selesai
         modalEl.classList.add('hidden');
-        // Logika overlay dipindahkan ke closeAllModals agar lebih terpusat
-    }, 200);
+    }, 200); // Sesuaikan dengan durasi transisi CSS
 }
+
 
 async function openSetupModal() {
     const totalBudgetInput = document.getElementById('total-budget');
     const categoryFieldsContainer = document.getElementById('category-fields');
 
-    // Ambil data saat ini dari DB
     const currentBudget = await getConfig('totalBudget');
     const currentCategories = await getCategories();
 
-    // Isi form
     totalBudgetInput.value = currentBudget || '';
-    categoryFieldsContainer.innerHTML = ''; // Kosongkan field kategori lama
+    categoryFieldsContainer.innerHTML = '';
     currentCategories.forEach(cat => {
-        createCategoryInput(cat.id, cat.name, cat.limit); // Panggil dengan data lengkap
+        createCategoryInput(cat.id, cat.name, cat.limit);
     });
 
     showModal(document.getElementById('setup-modal'));
@@ -187,15 +177,14 @@ async function openSetupModal() {
 function createCategoryInput(id = null, name = '', limit = '') {
     const container = document.getElementById('category-fields');
     const fieldWrapper = document.createElement('div');
-    fieldWrapper.className = 'flex gap-2 items-center category-entry'; // tambah class
-    // Tambahkan data-id jika ada
+    fieldWrapper.className = 'category-entry'; 
     if (id) {
         fieldWrapper.dataset.id = id;
     }
     fieldWrapper.innerHTML = `
-        <input type="text" name="category_name" class="w-2/3 p-2 border border-violet-200 rounded-lg" placeholder="Nama Kategori" value="${name}" required>
-        <input type="number" name="category_limit" class="w-1/3 p-2 border border-violet-200 rounded-lg" placeholder="Limit" value="${limit}" required>
-        <button type="button" class="text-red-500 remove-cat-btn p-1">&times;</button>`;
+        <input type="text" name="category_name" class="input-field-half" placeholder="Nama Kategori" value="${name}" required>
+        <input type="number" name="category_limit" class="input-field-half" placeholder="Limit" value="${limit}" required>
+        <button type="button" class="remove-cat-btn">&times;</button>`;
     container.appendChild(fieldWrapper);
     fieldWrapper.querySelector('.remove-cat-btn').addEventListener('click', () => fieldWrapper.remove());
 }
@@ -212,7 +201,6 @@ async function handleSetupForm(e) {
     let totalLimit = 0;
     const formCategoryIds = [];
 
-    // Validasi total limit dulu
     for (const entry of categoryEntries) {
         const limit = parseFloat(entry.querySelector('input[name="category_limit"]').value);
         if (!isNaN(limit) && limit > 0) {
@@ -225,14 +213,11 @@ async function handleSetupForm(e) {
         return;
     }
 
-    // Simpan budget utama
     await setConfig('totalBudget', totalBudget);
 
-    // Ambil ID kategori yang ada di DB sebelum diubah
     const originalCategories = await getCategories();
     const originalCategoryIds = originalCategories.map(cat => cat.id);
 
-    // Proses setiap entri di form
     for (const entry of categoryEntries) {
         const id = entry.dataset.id ? parseInt(entry.dataset.id, 10) : null;
         const name = entry.querySelector('input[name="category_name"]').value.trim();
@@ -240,23 +225,20 @@ async function handleSetupForm(e) {
 
         if (name && !isNaN(limit) && limit > 0) {
             if (id) {
-                // Ini kategori lama (UPDATE)
                 await updateCategory({ id, name, limit });
                 formCategoryIds.push(id);
             } else {
-                // Ini kategori baru (ADD)
                 await addCategory({ name, limit });
             }
         }
     }
 
-    // Cari kategori yang dihapus (ada di DB tapi tidak ada di form)
     const deletedIds = originalCategoryIds.filter(id => !formCategoryIds.includes(id));
     for (const id of deletedIds) {
         await deleteCategory(id);
     }
 
-    closeAllModals(); // Gunakan fungsi baru kita
+    closeAllModals();
     await renderUI();
 }
 
@@ -278,19 +260,21 @@ async function handleExpenseForm(e) {
 async function handleDataReset() {
     await resetDatabase();
     closeAllModals();
-    await renderUI(); // Re-render UI yang sekarang akan kosong
+    await renderUI();
 }
 
 // --- Fungsi Bantuan & PWA ---
 async function checkIfInitialSetupNeeded() {
     const budget = await getConfig('totalBudget');
-    if (budget === null) { // Hanya tampilkan jika belum pernah di-setup sama sekali
+    const categories = await getCategories();
+    if (budget === null && categories.length === 0) {
         openSetupModal();
         document.getElementById('close-setup-modal').classList.add('hidden');
     } else {
         document.getElementById('close-setup-modal').classList.remove('hidden');
     }
 }
+
 
 async function populateCategoryDropdown() {
     const selectEl = document.getElementById('expense-category');
@@ -304,7 +288,6 @@ async function populateCategoryDropdown() {
     });
 }
 
-// Kode PWA (tidak berubah dari versi sebelumnya)
 function registerServiceWorker() {
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
@@ -320,16 +303,26 @@ function initPwaInstall() {
         e.preventDefault();
         deferredPrompt = e;
         const installContainer = document.getElementById('install-container');
+        installContainer.style.display = 'block';
         installContainer.innerHTML = '';
+        
         const installButton = document.createElement('button');
         installButton.textContent = 'Pasang Aplikasi Dompet Damai';
-        installButton.className = 'px-4 py-2 bg-violet-500 text-white font-semibold rounded-lg shadow-md hover:bg-violet-600 transition';
+        installButton.className = 'btn-pwa-install'; 
         installContainer.appendChild(installButton);
+        
         installButton.addEventListener('click', () => {
             installButton.style.display = 'none';
             deferredPrompt.prompt();
             deferredPrompt.userChoice.then(() => { deferredPrompt = null; });
         });
+    });
+
+    window.addEventListener('appinstalled', () => {
+        const installContainer = document.getElementById('install-container');
+        if (installContainer) {
+            installContainer.style.display = 'none';
+        }
     });
 }
 ===== ./db.js =====
@@ -434,6 +427,149 @@ async function resetDatabase() {
 [file gambar: isi tidak ditampilkan]
 
 ===== ./index.html =====
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Budgeting PWA</title>
+    
+    <link rel="manifest" href="./manifest.json">
+    <meta name="theme-color" content="#8b5cf6">
+    
+    <link rel="stylesheet" href="./style.css">
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <script src="https://cdn.jsdelivr.net/npm/idb@7/build/umd.js"></script>
+    <script src="./utils.js" defer></script>
+    <script src="./db.js" defer></script>
+    <script src="./app.js" defer></script>
+</head>
+<body>
+
+    <div id="app-container">
+        <header>
+            <h1>Budgeting PWA</h1>
+            <p>Catat pengeluaran, tenangkan pikiran.</p>
+        </header>
+
+        <main id="main-content">
+            <section id="summary-card">
+                <h2>Ringkasan Bulan Ini</h2>
+                <div class="summary-grid">
+                    <div class="summary-item">
+                        <p class="summary-label">Anggaran</p>
+                        <p id="summary-limit" class="summary-value violet">Rp 0</p>
+                    </div>
+                    <div class="summary-item">
+                        <p class="summary-label">Terpakai</p>
+                        <p id="summary-spent" class="summary-value red">Rp 0</p>
+                    </div>
+                    <div class="summary-item">
+                        <p class="summary-label">Sisa</p>
+                        <p id="summary-remaining" class="summary-value green">Rp 0</p>
+                    </div>
+                </div>
+            </section>
+            
+            <section id="category-section">
+                <div class="section-header">
+                    <h2>Alokasi Dana</h2>
+                    <button id="setup-button" class="btn-text">+ Atur</button>
+                </div>
+                <div id="category-list"></div>
+            </section>
+            
+            <section id="history-section">
+                <h2>Riwayat Pengeluaran</h2>
+                <div id="expense-history"></div>
+            </section>
+
+            <section id="export-section">
+                <h2>Opsi Data</h2>
+                <p>Simpan cadangan data Anda secara lokal.</p>
+                <div class="btn-group">
+                    <button id="export-json-btn" class="btn-secondary">Ekspor JSON</button>
+                    <button id="export-csv-btn" class="btn-secondary">Ekspor CSV</button>
+                </div>
+            </section>
+        </main>
+
+        <div class="fab-container">
+            <button id="add-expense-button" class="fab">+</button>
+        </div>
+        
+        <footer id="install-container"></footer>
+    </div>
+
+    <div id="modal-overlay" class="modal-overlay hidden"></div>
+    
+    <div id="setup-modal" class="modal hidden">
+        <div class="modal-content">
+            <h3>Atur Anggaran</h3>
+            <form id="setup-form">
+                <div>
+                    <label for="total-budget">Total Anggaran Bulanan</label>
+                    <input type="number" id="total-budget" class="input-field-full" placeholder="5000000">
+                </div>
+                <hr>
+                <div class="section-header">
+                    <h4>Kategori</h4>
+                    <button type="button" id="add-category-field-button" class="btn-add-category">+ Tambah</button>
+                </div>
+                <div id="category-fields"></div>
+                <div class="modal-buttons">
+                    <button type="button" id="close-setup-modal" class="btn-cancel">Batal</button>
+                    <button type="submit" class="btn-primary">Simpan</button>
+                </div>
+            </form>
+            <div class="text-center">
+                <button id="reset-data-button" class="btn-reset">Reset Semua Data Aplikasi</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="expense-modal" class="modal hidden">
+        <div class="modal-content">
+            <h3>Catat Pengeluaran</h3>
+            <form id="expense-form">
+                <div>
+                    <label for="expense-amount">Jumlah</label>
+                    <input type="number" id="expense-amount" class="input-field-full" required>
+                </div>
+                <div>
+                    <label for="expense-category">Pilih Kategori</label>
+                    <select id="expense-category" class="input-field-full" required></select>
+                </div>
+                <div>
+                    <label for="expense-desc">Deskripsi (Opsional)</label>
+                    <input type="text" id="expense-desc" class="input-field-full" placeholder="Makan siang">
+                </div>
+                <div class="modal-buttons">
+                    <button type="button" id="close-expense-modal" class="btn-cancel">Batal</button>
+                    <button type="submit" class="btn-primary">Catat</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <div id="confirm-reset-modal" class="modal hidden">
+        <div class="modal-content center-content">
+            <h3 class="text-red-600">Anda Yakin?</h3>
+            <p>Semua data anggaran, kategori, dan riwayat pengeluaran akan dihapus permanen. Tindakan ini tidak dapat dibatalkan.</p>
+            <div class="modal-buttons">
+                <button type="button" id="cancel-reset-btn" class="btn-cancel">Batal</button>
+                <button type="button" id="confirm-reset-btn" class="btn-danger">Ya, Hapus Semua</button>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>
+===== ./index-tailwind-old.html =====
 <!-- index.html -->
 <!DOCTYPE html>
 <html lang="id">
@@ -450,6 +586,7 @@ async function resetDatabase() {
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/idb@7/build/umd.js"></script>
     
     <style>
         body { font-family: 'Poppins', sans-serif; }
@@ -647,23 +784,23 @@ export:
 
 ===== ./service-worker.js =====
 // service-worker.js
-const CACHE_NAME = 'dompet-damai-cache-v6';
+const CACHE_NAME = 'dompet-damai-cache-v10'; // Diubah ke v10
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
+    './style.css', // Memastikan style.css di-cache
     './db.js',
     './app.js',
-    './utils.js', // Memastikan utils.js di-cache
+    './utils.js',
     './manifest.json',
-    'https://cdn.tailwindcss.com',
     'https://cdn.jsdelivr.net/npm/idb@7/build/umd.js',
     'https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap',
+    'https://fonts.gstatic.com', // Penting untuk cache font dari Google
     './icons/icon-192x192.png',
     './icons/icon-512x512.png'
 ];
 
 // Event: Install
-// Menyimpan semua aset penting ke dalam cache saat service worker diinstal.
 self.addEventListener('install', event => {
     event.waitUntil(
         caches.open(CACHE_NAME)
@@ -672,11 +809,10 @@ self.addEventListener('install', event => {
                 return cache.addAll(ASSETS_TO_CACHE);
             })
     );
-    self.skipWaiting(); // Memaksa service worker baru untuk aktif segera.
+    self.skipWaiting();
 });
 
 // Event: Activate
-// Membersihkan cache lama yang sudah tidak terpakai.
 self.addEventListener('activate', event => {
     event.waitUntil(
         caches.keys().then(cacheNames => {
@@ -690,24 +826,618 @@ self.addEventListener('activate', event => {
             );
         })
     );
-    return self.clients.claim(); // Mengambil kontrol halaman yang terbuka.
+    return self.clients.claim();
 });
 
 // Event: Fetch
-// Menentukan bagaimana aplikasi merespon permintaan jaringan.
-// Strategi: Network First, Fallback to Cache.
 self.addEventListener('fetch', event => {
-    // Abaikan request selain GET
     if (event.request.method !== 'GET') return;
-    
+
     event.respondWith(
-        // Coba ambil dari jaringan terlebih dahulu
-        fetch(event.request).catch(() => {
-            // Jika gagal (misalnya, offline), cari di dalam cache.
-            return caches.match(event.request);
-        })
+        caches.match(event.request)
+            .then(response => {
+                if (response) {
+                    return response;
+                }
+                return fetch(event.request)
+                    .then(networkResponse => {
+                        return caches.open(CACHE_NAME).then(cache => {
+                            if (networkResponse.ok || networkResponse.type === 'opaque') {
+                                cache.put(event.request, networkResponse.clone());
+                            }
+                            return networkResponse;
+                        });
+                    })
+                    .catch(error => {
+                        console.log('Fetch failed, and no cache entry found for:', event.request.url, error);
+                    });
+            })
     );
 });
+===== ./style.css =====
+/* style.css */
+
+/* --- Variabel Warna --- */
+:root {
+    --violet-50: #f5f3ff;
+    --violet-100: #ede9fe;
+    --violet-200: #ddd6fe;
+    --violet-300: #c4b5fd; /* Ditambahkan untuk hover btn-add-category */
+    --violet-500: #8b5cf6;
+    --violet-600: #7c3aed;
+    --violet-700: #6d28d9;
+    --violet-800: #5b21b6;
+    --purple-300: #d8b4fe;
+
+    --red-500: #ef4444;
+    --red-600: #dc2626;
+    --red-800: #991b1b;
+
+    --green-600: #22c55e;
+
+    --gray-200: #e5e7eb;
+    --gray-300: #d1d5db; /* Ditambahkan untuk hover btn-cancel */
+    --gray-500: #6b7280;
+    --gray-600: #4b5563;
+    --gray-700: #374151;
+    --gray-800: #1f2937;
+    --black-opacity-40: rgba(0, 0, 0, 0.4);
+}
+
+/* --- Base Styles --- */
+body {
+    font-family: 'Poppins', sans-serif;
+    background-color: var(--violet-50);
+    color: var(--gray-800);
+    margin: 0;
+    padding: 0;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+::-webkit-scrollbar {
+    width: 8px;
+}
+::-webkit-scrollbar-track {
+    background: var(--violet-50);
+}
+::-webkit-scrollbar-thumb {
+    background: var(--violet-500);
+    border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: var(--violet-600);
+}
+
+#app-container {
+    max-width: 480px; /* max-w-md */
+    margin-left: auto;
+    margin-right: auto;
+    padding: 1rem; /* p-4 */
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* --- Header --- */
+header {
+    text-align: center;
+    margin-top: 1.5rem; /* my-6 */
+    margin-bottom: 1.5rem; /* my-6 */
+}
+
+header h1 {
+    font-size: 2rem; /* text-3xl */
+    font-weight: 700; /* font-bold */
+    color: var(--violet-700);
+    margin-bottom: 0.25rem;
+}
+
+header p {
+    color: var(--violet-600);
+}
+
+/* --- Main Content Sections --- */
+main {
+    flex-grow: 1; /* Agar mengambil sisa ruang */
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem; /* space-y-6 */
+    margin-bottom: 4rem; /* Ruang untuk FAB */
+}
+
+section {
+    background-color: #fff;
+    padding: 1.25rem; /* p-5 */
+    border-radius: 1rem; /* rounded-2xl */
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); /* shadow-md */
+}
+
+h2 {
+    font-size: 1.125rem; /* text-lg */
+    font-weight: 600; /* font-semibold */
+    color: var(--violet-800);
+    margin-bottom: 1rem; /* mb-4 */
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.section-header h2, .section-header h4 {
+    margin-bottom: 0; /* Override default h2/h4 margin */
+}
+
+.section-header h4 { /* Styling untuk "Kategori" di modal setup */
+    font-size: 1.125rem; /* text-lg */
+    font-weight: 600; /* font-semibold */
+    color: var(--violet-700);
+}
+
+/* --- Summary Card --- */
+#summary-card h2 {
+    border-bottom: 1px solid var(--violet-200); /* border-b pb-2 mb-4 */
+    padding-bottom: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.summary-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem; /* space-y-4 */
+}
+
+@media (min-width: 640px) { /* sm: */
+    .summary-grid {
+        flex-direction: row;
+        display: grid; /* sm:grid sm:grid-cols-3 */
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 1rem; /* sm:gap-4 */
+    }
+}
+
+.summary-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem; /* p-2 */
+    border-radius: 0.5rem; /* rounded-lg */
+}
+
+@media (min-width: 640px) { /* sm: */
+    .summary-item {
+        flex-direction: column;
+        align-items: flex-start; /* sm:items-start */
+        text-align: center; /* sm:text-center */
+    }
+}
+
+.summary-label {
+    font-size: 0.875rem; /* text-sm */
+    color: var(--gray-500);
+}
+
+.summary-value {
+    font-weight: 700; /* font-bold */
+    font-size: 1.125rem; /* text-lg */
+}
+
+.summary-value.violet { color: var(--violet-600); }
+.summary-value.red { color: var(--red-500); }
+.summary-value.green { color: var(--green-600); }
+
+
+/* --- Category List --- */
+#category-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem; /* space-y-4 */
+}
+
+#category-list p {
+    text-align: center;
+    color: var(--gray-500);
+    font-size: 0.875rem;
+}
+
+.category-item-wrapper {
+    margin-bottom: 0.5rem; /* mimic gap in original structure */
+}
+
+.category-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.25rem; /* mb-1 */
+}
+
+.category-name {
+    font-weight: 600; /* font-semibold */
+    color: var(--gray-700);
+}
+
+.category-amount {
+    font-size: 0.875rem; /* text-sm */
+    color: var(--gray-500);
+}
+
+.progress-bar-container { /* progress bar container */
+    width: 100%;
+    background-color: var(--violet-100);
+    border-radius: 9999px; /* rounded-full */
+    height: 0.625rem; /* h-2.5 */
+}
+
+.progress-bar { /* progress bar */
+    height: 0.625rem; /* h-2.5 */
+    border-radius: 9999px; /* rounded-full */
+    background-image: linear-gradient(to right, var(--purple-300), var(--violet-500)); /* bg-gradient-to-r from-purple-300 to-violet-500 */
+}
+
+/* --- Expense History --- */
+#expense-history {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem; /* space-y-3 */
+    max-height: 15rem; /* max-h-60 */
+    overflow-y: auto;
+}
+
+#expense-history p {
+    text-align: center;
+    color: var(--gray-500);
+    font-size: 0.875rem;
+}
+
+.expense-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.875rem; /* text-sm */
+}
+
+.expense-description {
+    font-weight: 600; /* font-semibold */
+}
+
+.expense-category-name {
+    font-size: 0.75rem; /* text-xs */
+    color: var(--gray-500);
+}
+
+.expense-amount-value {
+    font-weight: 600; /* font-semibold */
+    color: var(--red-500);
+}
+
+
+/* --- Export Section --- */
+#export-section p {
+    font-size: 0.875rem; /* text-sm */
+    color: var(--gray-500);
+    margin-bottom: 1rem;
+}
+
+.btn-group {
+    display: flex;
+    gap: 1rem; /* gap-4 */
+}
+
+
+/* --- Floating Action Button (FAB) --- */
+.fab-container {
+    position: fixed;
+    bottom: 1.5rem; /* bottom-6 */
+    right: 1.5rem; /* right-6 */
+}
+
+.fab {
+    background-color: var(--violet-500);
+    color: #fff;
+    width: 3.5rem; /* w-14 */
+    height: 3.5rem; /* h-14 */
+    border-radius: 9999px; /* rounded-full */
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); /* shadow-lg */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 3rem; /* text-3xl */
+    font-weight: 300; /* font-light */
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease-in-out; /* transition-transform transform hover:scale-110 */
+}
+
+.fab:hover {
+    background-color: var(--violet-600);
+    transform: scale(1.1);
+}
+
+/* --- PWA Install Button --- */
+#install-container {
+    text-align: center;
+    padding: 1rem;
+}
+
+.btn-pwa-install { /* Kelas baru untuk tombol install PWA */
+    padding: 0.5rem 1rem; /* px-4 py-2 */
+    background-color: var(--violet-500);
+    color: #fff;
+    font-weight: 600; /* font-semibold */
+    border-radius: 0.5rem; /* rounded-lg */
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); /* shadow-md */
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.btn-pwa-install:hover {
+    background-color: var(--violet-600);
+}
+
+
+/* --- Modals --- */
+.modal-overlay {
+    position: fixed;
+    inset: 0; /* inset-0 */
+    background-color: var(--black-opacity-40); /* bg-black bg-opacity-40 */
+    z-index: 40;
+}
+
+.modal {
+    position: fixed;
+    inset: 0; /* inset-0 */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem; /* p-4 */
+    z-index: 50;
+
+    /* Initial state (hidden by default) */
+    opacity: 0;
+    transform: scale(0.95);
+    visibility: hidden; /* Tambahkan ini untuk benar-benar menyembunyikan */
+    transition: opacity 0.2s ease-out, transform 0.2s ease-out, visibility 0.2s ease-out;
+}
+
+/* State saat modal aktif/terbuka */
+.modal.is-active {
+    opacity: 1;
+    transform: scale(1);
+    visibility: visible;
+}
+
+.modal.hidden { /* Untuk initial load dan setelah transisi hide selesai */
+    display: none;
+}
+
+
+.modal-content {
+    background-color: var(--violet-50);
+    width: 100%;
+    max-width: 24rem; /* max-w-sm */
+    padding: 1.5rem; /* p-6 */
+    border-radius: 1rem; /* rounded-2xl */
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); /* shadow-xl */
+    display: flex;
+    flex-direction: column;
+    gap: 1rem; /* space-y-4 */
+    /* Transisi sekarang ditangani di .modal */
+}
+
+.modal-content.center-content {
+    text-align: center;
+}
+
+.modal-content h3 {
+    font-size: 1.25rem; /* text-xl */
+    font-weight: 600; /* font-semibold */
+    color: var(--violet-800);
+    margin-bottom: 0.5rem; /* Tambahkan sedikit margin bawah */
+}
+
+.modal-content h3.text-red-600 { /* Khusus untuk konfirmasi reset */
+    color: var(--red-600);
+}
+
+.modal-content p {
+    color: var(--gray-600);
+    margin-bottom: 1rem; /* Tambahkan sedikit margin bawah */
+}
+
+.modal-content form {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem; /* space-y-4 */
+}
+
+.modal-content hr {
+    border-top: 1px solid var(--violet-200);
+}
+
+.modal-content label {
+    font-size: 0.875rem; /* text-sm */
+    font-weight: 500; /* font-medium */
+    color: var(--gray-600);
+    display: block; /* Agar label ada di baris sendiri */
+    margin-bottom: 0.25rem;
+}
+
+.input-field-full, /* Kelas baru untuk input field */
+.input-field-half, /* Kelas baru untuk input field setengah */
+.modal-content select {
+    width: 100%;
+    padding: 0.5rem; /* p-2 */
+    border: 1px solid var(--violet-200);
+    border-radius: 0.5rem; /* rounded-lg */
+    outline: none; /* Remove default focus outline */
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    box-sizing: border-box; /* Pastikan padding tidak menambah lebar */
+}
+
+.input-field-full:focus,
+.input-field-half:focus,
+.modal-content select:focus {
+    border-color: var(--violet-500); /* focus:border-violet-500 */
+    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2); /* focus:ring-violet-500 */
+}
+
+.modal-content select {
+    background-color: #fff; /* bg-white */
+}
+
+.modal-buttons {
+    display: flex;
+    gap: 1rem; /* gap-4 */
+    padding-top: 1rem; /* pt-4 */
+    border-top: 1px solid var(--gray-200); /* border-t mt-4 */
+    margin-top: 1rem; /* Adjust if border-top is not enough */
+}
+
+.modal-buttons .btn-primary,
+.modal-buttons .btn-cancel,
+.modal-buttons .btn-danger {
+    flex: 1; /* w-full */
+    padding: 0.5rem 1rem; /* py-2 */
+    border-radius: 0.5rem; /* rounded-lg */
+    font-weight: 500;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+/* --- Form Category Fields (Setup Modal) --- */
+#category-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem; /* space-y-2 */
+    max-height: 10rem; /* max-h-40 */
+    overflow-y: auto;
+    padding-right: 0.5rem; /* Untuk mengakomodasi scrollbar */
+}
+
+.category-entry {
+    display: flex;
+    gap: 0.5rem; /* gap-2 */
+    align-items: center;
+}
+
+.category-entry .input-field-half:first-child { /* input for category name */
+    width: 65%; /* sedikit diubah dari 2/3 untuk penyesuaian */
+}
+
+.category-entry .input-field-half:last-of-type { /* input for category limit */
+    width: 35%; /* sedikit diubah dari 1/3 untuk penyesuaian */
+}
+
+
+.remove-cat-btn {
+    color: var(--red-500);
+    padding: 0.25rem; /* p-1 */
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    line-height: 1;
+    flex-shrink: 0; /* Pastikan tombol tidak menyusut */
+}
+.remove-cat-btn:hover {
+    color: var(--red-600);
+}
+
+
+/* --- Buttons --- */
+.btn-primary {
+    background-color: var(--violet-500);
+    color: #fff;
+}
+
+.btn-primary:hover {
+    background-color: var(--violet-600);
+}
+
+.btn-cancel {
+    background-color: var(--gray-200);
+    color: var(--gray-700);
+}
+
+.btn-cancel:hover {
+    background-color: var(--gray-300);
+}
+
+.btn-text { /* Untuk +Atur */
+    color: var(--violet-600);
+    font-weight: 600; /* font-semibold */
+    font-size: 0.875rem; /* text-sm */
+    background: none;
+    border: none;
+    cursor: pointer;
+}
+.btn-text:hover {
+    color: var(--violet-700);
+}
+
+.btn-add-category {
+    font-size: 0.875rem; /* text-sm */
+    background-color: var(--violet-200);
+    color: var(--violet-800);
+    padding: 0.25rem 0.75rem; /* px-3 py-1 */
+    border-radius: 9999px; /* rounded-full */
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+.btn-add-category:hover {
+    background-color: var(--violet-300);
+}
+
+.btn-reset {
+    font-size: 0.875rem; /* text-sm */
+    color: var(--red-600);
+    background: none;
+    border: none;
+    cursor: pointer;
+    margin-top: 1rem; /* pt-4 */
+}
+.btn-reset:hover {
+    color: var(--red-800);
+}
+
+.btn-danger { /* Khusus untuk tombol konfirmasi hapus */
+    background-color: var(--red-500);
+    color: #fff;
+}
+.btn-danger:hover {
+    background-color: var(--red-600);
+}
+
+.btn-secondary {
+    width: 100%;
+    padding: 0.5rem; /* py-2 */
+    background-color: var(--violet-100);
+    color: var(--violet-700);
+    font-weight: 600; /* font-semibold */
+    border-radius: 0.5rem; /* rounded-lg */
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+.btn-secondary:hover {
+    background-color: var(--violet-200);
+}
+
+/* Utility classes - some might still be needed if logic depends on them */
+.hidden {
+    display: none !important;
+}
+
+.text-center {
+    text-align: center;
+}
 ===== ./utils.js =====
 /**
  * utils.js - Berisi fungsi bantuan seperti format mata uang dan ekspor data.
@@ -799,4 +1529,3 @@ async function exportToCSV() {
         alert('Gagal mengekspor data.');
     }
 }
-

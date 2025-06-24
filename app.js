@@ -88,13 +88,14 @@ async function renderCategories() {
         const spentOnCat = expensesForCat.reduce((sum, exp) => sum + exp.amount, 0);
         const progress = cat.limit > 0 ? (spentOnCat / cat.limit) * 100 : 0;
         const item = document.createElement('div');
+        item.className = 'category-item-wrapper';
         item.innerHTML = `
-            <div class="flex justify-between items-center mb-1">
-                <span class="font-semibold text-gray-700">${cat.name}</span>
-                <span class="text-sm text-gray-500">${formatCurrency(spentOnCat)} / ${formatCurrency(cat.limit)}</span>
+            <div class="category-item-header">
+                <span class="category-name">${cat.name}</span>
+                <span class="category-amount">${formatCurrency(spentOnCat)} / ${formatCurrency(cat.limit)}</span>
             </div>
-            <div class="w-full bg-violet-100 rounded-full h-2.5">
-                <div class="bg-gradient-to-r from-purple-300 to-violet-500 h-2.5 rounded-full" style="width: ${Math.min(100, progress)}%"></div>
+            <div class="progress-bar-container">
+                <div class="progress-bar" style="width: ${Math.min(100, progress)}%"></div>
             </div>`;
         categoryListEl.appendChild(item);
     }
@@ -112,72 +113,61 @@ async function renderExpenseHistory() {
     const categoryMap = new Map(categories.map(cat => [cat.id, cat.name]));
     expenses.slice(0, 15).forEach(exp => { // Tampilkan 15 terakhir
         const item = document.createElement('div');
-        item.className = "flex justify-between items-center text-sm";
+        item.className = "expense-item";
         item.innerHTML = `
             <div>
-                <p class="font-semibold">${exp.description || 'Pengeluaran'}</p>
-                <p class="text-xs text-gray-500">${categoryMap.get(exp.categoryId) || 'Lainnya'}</p>
+                <p class="expense-description">${exp.description || 'Pengeluaran'}</p>
+                <p class="expense-category-name">${categoryMap.get(exp.categoryId) || 'Lainnya'}</p>
             </div>
-            <span class="font-semibold text-red-500">${formatCurrency(exp.amount)}</span>`;
+            <span class="expense-amount-value">${formatCurrency(exp.amount)}</span>`;
         historyEl.appendChild(item);
     });
 }
 
 // --- Fungsi Modal & Form ---
 
-// Fungsi baru untuk menutup semua modal dan overlay
 function closeAllModals() {
     const overlay = document.getElementById('modal-overlay');
-    // Cek dulu apakah ada modal yang terbuka untuk ditutup
+    // Hanya sembunyikan overlay jika ada modal yang aktif
     if (!overlay.classList.contains('hidden')) {
-        const setupModal = document.getElementById('setup-modal');
-        const expenseModal = document.getElementById('expense-modal');
-        const confirmResetModal = document.getElementById('confirm-reset-modal');
-        
-        hideModal(setupModal);
-        hideModal(expenseModal);
-        hideModal(confirmResetModal);
-        // Sembunyikan overlay setelah animasi modal selesai
-        setTimeout(() => overlay.classList.add('hidden'), 200);
+        const activeModals = document.querySelectorAll('.modal:not(.hidden)');
+        activeModals.forEach(modal => hideModal(modal));
+        // Sembunyikan overlay setelah semua modal selesai transisi
+        setTimeout(() => overlay.classList.add('hidden'), 200); // Sesuaikan dengan durasi transisi CSS
     }
 }
 
 function showModal(modalEl) {
-    const modalContent = modalEl.querySelector('div');
     document.getElementById('modal-overlay').classList.remove('hidden');
     modalEl.classList.remove('hidden');
-    setTimeout(() => {
-        modalContent.classList.remove('scale-95', 'opacity-0');
-        modalContent.classList.add('scale-100', 'opacity-100');
+    // Tambahkan kelas 'is-active' untuk memulai transisi
+    setTimeout(() => { // Beri sedikit delay agar browser menerapkan 'display: block' sebelum transisi
+        modalEl.classList.add('is-active');
     }, 10);
 }
 
 function hideModal(modalEl) {
-    // Jangan lakukan apa-apa jika modal sudah hidden
     if (!modalEl || modalEl.classList.contains('hidden')) return;
 
-    const modalContent = modalEl.querySelector('div');
-    modalContent.classList.remove('scale-100', 'opacity-100');
-    modalContent.classList.add('scale-95', 'opacity-0');
-    setTimeout(() => {
+    // Hapus kelas 'is-active' untuk memulai transisi keluar
+    modalEl.classList.remove('is-active');
+    setTimeout(() => { // Sembunyikan setelah transisi selesai
         modalEl.classList.add('hidden');
-        // Logika overlay dipindahkan ke closeAllModals agar lebih terpusat
-    }, 200);
+    }, 200); // Sesuaikan dengan durasi transisi CSS
 }
+
 
 async function openSetupModal() {
     const totalBudgetInput = document.getElementById('total-budget');
     const categoryFieldsContainer = document.getElementById('category-fields');
 
-    // Ambil data saat ini dari DB
     const currentBudget = await getConfig('totalBudget');
     const currentCategories = await getCategories();
 
-    // Isi form
     totalBudgetInput.value = currentBudget || '';
-    categoryFieldsContainer.innerHTML = ''; // Kosongkan field kategori lama
+    categoryFieldsContainer.innerHTML = '';
     currentCategories.forEach(cat => {
-        createCategoryInput(cat.id, cat.name, cat.limit); // Panggil dengan data lengkap
+        createCategoryInput(cat.id, cat.name, cat.limit);
     });
 
     showModal(document.getElementById('setup-modal'));
@@ -186,15 +176,14 @@ async function openSetupModal() {
 function createCategoryInput(id = null, name = '', limit = '') {
     const container = document.getElementById('category-fields');
     const fieldWrapper = document.createElement('div');
-    fieldWrapper.className = 'flex gap-2 items-center category-entry'; // tambah class
-    // Tambahkan data-id jika ada
+    fieldWrapper.className = 'category-entry'; 
     if (id) {
         fieldWrapper.dataset.id = id;
     }
     fieldWrapper.innerHTML = `
-        <input type="text" name="category_name" class="w-2/3 p-2 border border-violet-200 rounded-lg" placeholder="Nama Kategori" value="${name}" required>
-        <input type="number" name="category_limit" class="w-1/3 p-2 border border-violet-200 rounded-lg" placeholder="Limit" value="${limit}" required>
-        <button type="button" class="text-red-500 remove-cat-btn p-1">&times;</button>`;
+        <input type="text" name="category_name" class="input-field-half" placeholder="Nama Kategori" value="${name}" required>
+        <input type="number" name="category_limit" class="input-field-half" placeholder="Limit" value="${limit}" required>
+        <button type="button" class="remove-cat-btn">&times;</button>`;
     container.appendChild(fieldWrapper);
     fieldWrapper.querySelector('.remove-cat-btn').addEventListener('click', () => fieldWrapper.remove());
 }
@@ -211,7 +200,6 @@ async function handleSetupForm(e) {
     let totalLimit = 0;
     const formCategoryIds = [];
 
-    // Validasi total limit dulu
     for (const entry of categoryEntries) {
         const limit = parseFloat(entry.querySelector('input[name="category_limit"]').value);
         if (!isNaN(limit) && limit > 0) {
@@ -224,14 +212,11 @@ async function handleSetupForm(e) {
         return;
     }
 
-    // Simpan budget utama
     await setConfig('totalBudget', totalBudget);
 
-    // Ambil ID kategori yang ada di DB sebelum diubah
     const originalCategories = await getCategories();
     const originalCategoryIds = originalCategories.map(cat => cat.id);
 
-    // Proses setiap entri di form
     for (const entry of categoryEntries) {
         const id = entry.dataset.id ? parseInt(entry.dataset.id, 10) : null;
         const name = entry.querySelector('input[name="category_name"]').value.trim();
@@ -239,23 +224,20 @@ async function handleSetupForm(e) {
 
         if (name && !isNaN(limit) && limit > 0) {
             if (id) {
-                // Ini kategori lama (UPDATE)
                 await updateCategory({ id, name, limit });
                 formCategoryIds.push(id);
             } else {
-                // Ini kategori baru (ADD)
                 await addCategory({ name, limit });
             }
         }
     }
 
-    // Cari kategori yang dihapus (ada di DB tapi tidak ada di form)
     const deletedIds = originalCategoryIds.filter(id => !formCategoryIds.includes(id));
     for (const id of deletedIds) {
         await deleteCategory(id);
     }
 
-    closeAllModals(); // Gunakan fungsi baru kita
+    closeAllModals();
     await renderUI();
 }
 
@@ -277,19 +259,21 @@ async function handleExpenseForm(e) {
 async function handleDataReset() {
     await resetDatabase();
     closeAllModals();
-    await renderUI(); // Re-render UI yang sekarang akan kosong
+    await renderUI();
 }
 
 // --- Fungsi Bantuan & PWA ---
 async function checkIfInitialSetupNeeded() {
     const budget = await getConfig('totalBudget');
-    if (budget === null) { // Hanya tampilkan jika belum pernah di-setup sama sekali
+    const categories = await getCategories();
+    if (budget === null && categories.length === 0) {
         openSetupModal();
         document.getElementById('close-setup-modal').classList.add('hidden');
     } else {
         document.getElementById('close-setup-modal').classList.remove('hidden');
     }
 }
+
 
 async function populateCategoryDropdown() {
     const selectEl = document.getElementById('expense-category');
@@ -303,7 +287,6 @@ async function populateCategoryDropdown() {
     });
 }
 
-// Kode PWA (tidak berubah dari versi sebelumnya)
 function registerServiceWorker() {
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
@@ -319,15 +302,25 @@ function initPwaInstall() {
         e.preventDefault();
         deferredPrompt = e;
         const installContainer = document.getElementById('install-container');
+        installContainer.style.display = 'block';
         installContainer.innerHTML = '';
+        
         const installButton = document.createElement('button');
         installButton.textContent = 'Pasang Aplikasi Dompet Damai';
-        installButton.className = 'px-4 py-2 bg-violet-500 text-white font-semibold rounded-lg shadow-md hover:bg-violet-600 transition';
+        installButton.className = 'btn-pwa-install'; 
         installContainer.appendChild(installButton);
+        
         installButton.addEventListener('click', () => {
             installButton.style.display = 'none';
             deferredPrompt.prompt();
             deferredPrompt.userChoice.then(() => { deferredPrompt = null; });
         });
+    });
+
+    window.addEventListener('appinstalled', () => {
+        const installContainer = document.getElementById('install-container');
+        if (installContainer) {
+            installContainer.style.display = 'none';
+        }
     });
 }
