@@ -1,18 +1,18 @@
 // service-worker.js
-const CACHE_NAME = 'dompet-damai-cache-v10'; // Diubah ke v10
+const CACHE_NAME = 'dompet-damai-cache-v11'; 
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
-    './style.css', // Memastikan style.css di-cache
+    './style.css',
     './db.js',
     './app.js',
     './utils.js',
     './manifest.json',
     'https://cdn.jsdelivr.net/npm/idb@7/build/umd.js',
     'https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap',
-    'https://fonts.gstatic.com', // Penting untuk cache font dari Google
     './icons/icon-192x192.png',
     './icons/icon-512x512.png'
+    // 'https://fonts.gstatic.com' <<< DIHAPUS dari daftar ini
 ];
 
 // Event: Install
@@ -51,12 +51,18 @@ self.addEventListener('fetch', event => {
     event.respondWith(
         caches.match(event.request)
             .then(response => {
+                // Jika ada di cache, kembalikan dari cache
                 if (response) {
                     return response;
                 }
+            
+                // Jika tidak ada, coba ambil dari jaringan
                 return fetch(event.request)
                     .then(networkResponse => {
+                        // Buka cache dan simpan response dari jaringan
                         return caches.open(CACHE_NAME).then(cache => {
+                            // Pastikan response valid sebelum di-cache
+                            // Ini akan menangkap file font .woff2 dari fonts.gstatic.com
                             if (networkResponse.ok || networkResponse.type === 'opaque') {
                                 cache.put(event.request, networkResponse.clone());
                             }
@@ -65,6 +71,7 @@ self.addEventListener('fetch', event => {
                     })
                     .catch(error => {
                         console.log('Fetch failed, and no cache entry found for:', event.request.url, error);
+                        // Di sini bisa ditambahkan fallback jika diperlukan
                     });
             })
     );
