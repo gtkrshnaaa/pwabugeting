@@ -1,7 +1,7 @@
 // ===== ./db.js =====
 // db.js - Skema Database Baru untuk Pelacakan Pengeluaran
 
-const DB_NAME = 'DompetDamaiDB-v2';
+const DB_NAME = 'PWABudgetingDB-v2';
 const DB_VERSION = 1;
 const STORES = {
     CONFIG: 'config',

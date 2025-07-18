@@ -306,7 +306,7 @@ function initPwaInstall() {
         installContainer.innerHTML = '';
         
         const installButton = document.createElement('button');
-        installButton.textContent = 'Pasang Aplikasi Dompet Damai';
+        installButton.textContent = 'Pasang Aplikasi PWA Budgeting';
         installButton.className = 'btn-pwa-install'; 
         installContainer.appendChild(installButton);
         
