@@ -231,7 +231,7 @@ h2 {
 }
 
 #expense-history p {
-    text-align: center;
+    text-align: start;
     color: var(--gray-500);
     font-size: 0.875rem;
 }
